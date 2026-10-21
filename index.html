@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.22';
+const VERSION='beta 0.23';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -723,10 +723,22 @@ function loadPeerJS(){
   return NET._loading=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('No se pudo cargar la conexión. Revisá internet.'));document.head.appendChild(s)});
 }
 function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}}
+// para avisos que tienen que llegar sí o sí (cartas, eventos, listas, alarma):
+// si al mandarlos no hay conexión en vivo, se guardan y se reintentan solos
+// apenas vuelva a conectar (al abrir la app, al reconectar, etc).
+function netSendSure(msg){
+  netSend(msg);
+  if(!NET.ready){S.outbox=S.outbox||[];S.outbox.push(msg);save()}
+}
+function flushOutbox(){
+  if(!NET.ready||!S.outbox||!S.outbox.length)return;
+  const items=S.outbox;S.outbox=[];save();
+  items.forEach(m=>netSend(m));
+}
 function netWire(conn){
   NET.conn=conn;NET.remotePeerId=conn.peer;
   if(conn.open){NET.ready=true;netOnStatus(true)}
-  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});NET.onPairConnect&&NET.onPairConnect()});
+  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
   conn.on('data',d=>{
     if(!d||!d.type)return;
     if(d.type==='hello'&&NET.onHello)NET.onHello(d);
@@ -1290,7 +1302,7 @@ function renderAlarm(){
 function fire(heavy){
   alarmState='sent';S.lastAlarm={heavy:!!heavy,t:Date.now()};save();entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
   S.feed.unshift({from:'m',text:heavy?'Alarma de sueño pesado':'Alarma para despertar',t:Date.now()});save();renderFeed();
-  netSend({type:'alarm',heavy:!!heavy});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Abrí Twin Particles','alarm');
+  netSendSure({type:'alarm',heavy:!!heavy});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Abrí Twin Particles','alarm');
   if(!NET.ready)toast('Guardado · '+S.partner+' no está conectado ahora, no va a sonarle');
 }
 
@@ -1338,8 +1350,8 @@ function stopRing(how){
   const el=$('#ring');if(el)el.remove();
   const r=ringing;ringing=null;if(!r)return;
   if(r.test)return toast(how==='snooze'?'Prueba terminada · se repetiría en 5 min':'Prueba terminada');
-  if(how==='snooze'){S.feed.unshift({from:'m',text:'5 minutos más',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'snooze'});pushPartner('Pidió 5 minutos más','','alarmResp');toast(NET.ready?S.partner+' sabe que pediste 5 minutos más':'Guardado · no se pudo avisar a '+S.partner)}
-  else{S.feed.unshift({from:'m',text:'Ya me desperté',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'off'});pushPartner('Ya se despertó','','alarmResp');toast(NET.ready?'Alarma apagada · '+S.partner+' ya lo sabe':'Alarma apagada · no se pudo avisar a '+S.partner)}
+  if(how==='snooze'){S.feed.unshift({from:'m',text:'5 minutos más',t:Date.now()});save();renderFeed();entangle();netSendSure({type:'alarmResp',how:'snooze'});pushPartner('Pidió 5 minutos más','','alarmResp');toast(NET.ready?S.partner+' sabe que pediste 5 minutos más':'Guardado · no se pudo avisar a '+S.partner)}
+  else{S.feed.unshift({from:'m',text:'Ya me desperté',t:Date.now()});save();renderFeed();entangle();netSendSure({type:'alarmResp',how:'off'});pushPartner('Ya se despertó','','alarmResp');toast(NET.ready?'Alarma apagada · '+S.partner+' ya lo sabe':'Alarma apagada · no se pudo avisar a '+S.partner)}
 }
 
 /* álbumes */
@@ -1758,7 +1770,7 @@ function addItem(L,items){
         ${has(it.t)?'<div class="note">Ya está en la lista.</div>':''}
         <div class="row"><button class="btn soft" id="pBack" style="flex:1">Buscar otra</button><button class="btn" id="pAdd" style="flex:2">Agregar a ${L.n}</button></div>`,()=>{
         $('#pBack').onclick=()=>addItem(L,items);
-        $('#pAdd').onclick=()=>{items.unshift(it);save();netSend({type:'listadd',listId:L.id,item:it});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
+        $('#pAdd').onclick=()=>{items.unshift(it);save();netSendSure({type:'listadd',listId:L.id,item:it});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
       });
     };
     $('#manual').onclick=()=>{$('#manual').hidden=true;const m=$('#mform');m.hidden=false;m.innerHTML=manualForm(L);bindManual(L,items)};
@@ -1788,7 +1800,7 @@ function bindManual(L,items){
     const it={t,meta:$('#am').value.trim(),desc:$('#ad').value.trim(),by:'m',g:hashStr(t+Date.now()),id:uid()};
     if(link)Object.assign(it,{url:link.url,src:link.src,host:link.host});
     if(auto&&auto.img)it.img=auto.img;
-    const done=()=>{items.unshift(it);save();const payload=Object.assign({},it);if(it.k&&blobs[it.k])payload.blob=blobs[it.k];netSend({type:'listadd',listId:L.id,item:payload});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
+    const done=()=>{items.unshift(it);save();const payload=Object.assign({},it);if(it.k&&blobs[it.k])payload.blob=blobs[it.k];netSendSure({type:'listadd',listId:L.id,item:payload});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
     if(file){const r=new FileReader();r.onload=()=>{const k=uid();blobs[k]=r.result;it.k=k;done()};r.readAsDataURL(file)}else done();
   };
 }
@@ -1824,7 +1836,7 @@ V.calendario=function(){
     <button class="btn full" id="eOk">Guardar evento</button>`,()=>{
       let w='ambos';document.querySelectorAll('#ew button').forEach(b=>b.onclick=()=>{w=b.dataset.w;document.querySelectorAll('#ew button').forEach(x=>x.classList.toggle('on',x===b))});
       $('#et').focus();
-      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return;const ev={id:uid(),d,tm:$('#eh').value,t,who:w};S.events.push(ev);save();netSend({type:'eventadd',ev});pushPartner('Agregó un evento',t,'event');selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();entangle();toast('Evento agregado')}});
+      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return;const ev={id:uid(),d,tm:$('#eh').value,t,who:w};S.events.push(ev);save();netSendSure({type:'eventadd',ev});pushPartner('Agregó un evento',t,'event');selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();entangle();toast('Evento agregado')}});
 };
 
 /* cartas */
@@ -1965,7 +1977,7 @@ function compose(kind0){
         const letter=Object.assign({id:uid(),from:'m',kind,title:t,date:TODAYS,openAt:oa,opened:0},extra);
         S.letters.unshift(letter);if(kind==='text')S.draft=null;save();closeSheet();box='out';V.cartas();entangle();
         const payload=Object.assign({},letter);if(letter.k&&blobs[letter.k])payload.blob=blobs[letter.k];
-        netSend({type:'letter',letter:payload});pushPartner('Te mandó una carta',t,'letter');
+        netSendSure({type:'letter',letter:payload});pushPartner('Te mandó una carta',t,'letter');
         toast(NET.ready?'Carta enviada a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora, no le llegó todavía')};
       if(kind==='text'){const tx=ta.value.trim();if(!tx){$('#lerr').textContent='La carta está vacía.';return ta.focus()}return done({text:tx,hand:S.prefs.hand,ink:S.prefs.ink})}
       if(!file)return $('#lerr').textContent=kind==='photo'?'Falta la foto de la carta.':'Falta el audio.';

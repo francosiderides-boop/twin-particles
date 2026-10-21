@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.22';
+const CACHE='tp-beta-0.23';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -15,16 +15,26 @@ self.addEventListener('fetch',e=>{
     return res})));
 });
 /* notificaciones en segundo plano (Web Push) */
+const VIB={
+  beat:[25,45,25,45,25,45,25,250,25,45,25,45,25,45,25], // doble latido, como un corazón real
+  alarm:[300,120,300,120,300,120,300,120,300],
+  letter:[20,60,20,60,80,60,20],
+  alarmResp:[15,50,15],
+  event:[40,50,40,50,40],
+  list:[40,50,40,50,40],
+  touch:[18,60,18]
+};
 self.addEventListener('push',e=>{
   let d={};try{d=e.data?e.data.json():{}}catch(err){}
   const title=d.title||'Twin Particles';
+  const tag=d.tag||'tp';
   e.waitUntil(self.registration.showNotification(title,{
     body:d.body||'',
     icon:'icon-192.png',
     badge:'icon-192.png',
-    tag:d.tag||'tp',
+    tag,
     renotify:true,
-    vibrate:[60,40,60],
+    vibrate:VIB[tag]||[60,40,60],
     data:{url:d.url||'./'}
   }));
 });
