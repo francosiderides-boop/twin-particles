@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.26';
+const CACHE='tp-beta-0.27';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -37,6 +37,15 @@ self.addEventListener('push',e=>{
     vibrate:VIB[tag]||[60,40,60],
     data:{url:d.url||'./'}
   }));
+});
+/* si el navegador rota la suscripción push sola (pasa cada tanto), hay que
+   renovarla; si no, dejan de llegar avisos en 2do plano sin que nadie se
+   entere. La app vuelve a mandarle la nueva al otro teléfono la próxima vez
+   que se abra (ensurePush ya hace eso siempre). */
+self.addEventListener('pushsubscriptionchange',e=>{
+  const VAPID='BMzKUgL6etueLcdZg9z7grPb8F01ZjYBNPYk2uL978mFxENeNOALZsX8wjlrUPPtejHd1BuU0arYbZK9i_yGWdM';
+  const b64uToBuf=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
+  e.waitUntil(self.registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBuf(VAPID)}).catch(()=>{}));
 });
 self.addEventListener('notificationclick',e=>{
   e.notification.close();
