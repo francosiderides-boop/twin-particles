@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.16';
+const VERSION='beta 0.17';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -694,7 +694,7 @@ const TOK=['bg','surface','surface2','fg','muted','line','a','b','ok','warn'];
 
 /* ---------- estado ---------- */
 const DEF={
-  v:VERSION,paired:false,prefs:{vib:true,sound:true,tone:'entrelazado'},pairedAt:null,me:'',partner:'',skin:'auto',tab:'inicio',
+  v:VERSION,paired:false,solo:false,prefs:{vib:true,sound:true,tone:'entrelazado'},pairedAt:null,me:'',partner:'',skin:'auto',tab:'inicio',
   signals:['Te amo','Te extraño','Tengo hambre','Vamos','Es tarde','Tengo sueño','Ya llego','Llamame'],
   feed:[],
   albums:[],
@@ -891,9 +891,23 @@ function obGo(step){
       <h1>Dos partículas.<br>Un mismo estado.</h1>
       <p class="lead">Vinculá tu teléfono con el de tu pareja: lo que le pasa a uno, el otro lo siente al instante.</p>
       <button class="btn lg full" id="obCreate">Crear vínculo</button>
-      <button class="btn lg soft full" id="obJoin">Tengo un código</button></div>`;
+      <button class="btn lg soft full" id="obJoin">Tengo un código</button>
+      <button class="btn ghost full" id="obSolo">Entrar como partícula solitaria</button></div>`;
     $('#obCreate').onclick=()=>{ob.mode='create';obGo('create')};
     $('#obJoin').onclick=()=>{ob.mode='join';obGo('join')};
+    $('#obSolo').onclick=()=>{ob.mode='solo';obGo('solo')};
+  }
+  if(step==='solo'){
+    if(!S.prefs.myColor){S.prefs.myColor='coral';applySkin()}
+    P.innerHTML=`<div class="ob-panel">
+      <h1>Elegí el color de tu partícula</h1>
+      <p class="lead">Vas a poder usar la app sola/solo, sin vincularte todavía. Podés vincularte más tarde desde Ajustes, pero solo vas a poder entrar como pareja si la vinculación es real.</p>
+      ${colorPicker(S.prefs.myColor)}
+      <button class="btn lg full" id="obNext">Entrar</button>
+      <button class="btn ghost full" id="obBack">Volver</button></div>`;
+    bindColorPicker(()=>field&&field.flare());
+    $('#obNext').onclick=()=>{S.solo=true;save();enterApp()};
+    $('#obBack').onclick=()=>obGo('welcome');
   }
   if(step==='create'){
     const AL='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ob.code=Array.from({length:6},()=>AL[Math.floor(Math.random()*AL.length)]).join('');
@@ -988,7 +1002,7 @@ function bond(){
     NET.onPairConnect=null;
     S.myPeerId=ob.myId||NET.id||null;
     S.partnerPeerId=ob.mode==='create'?NET.remotePeerId:('tp9-'+ob.code);
-    S.paired=true;S.pairedAt=TODAYS;save();
+    S.paired=true;S.solo=false;S.pairedAt=TODAYS;save();
     P.innerHTML=`<div class="ob-panel bonded-msg">
       <span class="label">Correlación 1.00</span>
       <h1>Vos y ${esc(S.partner)}<br>ahora son Twin Particles</h1>
@@ -2177,9 +2191,9 @@ $('#openSettings').onclick=()=>{
      <div><span>Tu letra</span><span class="hand-prev" style="${handStyle(S.prefs.hand,S.prefs.ink)}">${S.prefs.hand?esc(HANDS[S.prefs.hand].n):'Sin elegir'}</span></div></div>
      <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div></div>
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
-     <div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div>
-     <div><span>Teléfono de ${esc(S.partner)}</span><span class="sub">Sin sincronizar todavía</span></div></div>
-     <button class="btn danger full" id="unpair">Desvincular teléfonos</button></div>
+     <div><span>Estado</span><b>${S.paired?'Vinculados':'Partícula solitaria'}</b></div>
+     ${S.paired?`<div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div><div><span>Conexión en vivo</span><span class="sub" id="netStatusTxt">${NET.ready?'Conectada ahora':'No conectada ahora'}</span></div>`:`<div><span>Todavía no te vinculaste con tu pareja</span></div>`}</div>
+     ${S.paired?'<button class="btn danger full" id="unpair">Desvincular teléfonos</button>':'<button class="btn full" id="pairNow">Vincularme con mi pareja</button>'}</div>
    <div class="row"><button class="btn soft full" id="reset">Borrar todo</button><button class="btn full" id="sOk">Listo</button></div>
    <div class="ver">Twin Particles · ${VERSION}</div>`,()=>{
     document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{S.skin=b.dataset.s;save();applySkin();document.querySelectorAll('[data-s]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b)});entangle()});
@@ -2193,8 +2207,9 @@ $('#openSettings').onclick=()=>{
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
       $('#si').onclick=()=>{const keep={skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
-    $('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
-      $('#no').onclick=closeSheet;$('#si').onclick=()=>{S.paired=false;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();if(field){field.stop();field=null}showOnboard()}});
+    $('#unpair')&&($('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
+      $('#no').onclick=closeSheet;$('#si').onclick=()=>{S.paired=false;S.solo=true;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();toast('Desvinculado · seguís como partícula solitaria');go(S.tab)}}));
+    $('#pairNow')&&($('#pairNow').onclick=()=>{closeSheet();if(field){field.stop();field=null}showOnboard()});
   });
 };
 
@@ -2212,10 +2227,10 @@ mfLoadSaved();
 NET.onSignal=d=>receive(d.text);
 NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();vib(d.n>1?[18,60,18,60,18]:14);entangle();push(S.partner,'te tocó');renderFeed&&renderFeed()};
 NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();vib([40,70,40,70,40]);entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');renderFeed&&renderFeed()};
-if(S.paired){
+if(S.paired||S.solo){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
-  if(S.myPeerId&&S.partnerPeerId)netConnectToPartner();
+  if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
 }else showOnboard();
 })();
 </script>
