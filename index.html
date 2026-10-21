@@ -63,7 +63,8 @@ h3{font-size:15px;font-weight:700;margin:0}
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:4px 12px}
 .top-r{display:flex;align-items:center;gap:8px}
 .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:99px;background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:600}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none;opacity:.35;transition:opacity .3s}
+.dot.on{opacity:1}
 .iconbtn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:1px solid var(--line);flex:none}
 .iconbtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .view{animation:fadeIn .28s var(--ease)}
@@ -548,7 +549,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
     <header class="top">
       <span class="brandrow"><span id="isoTop" aria-label="Twin Particles" role="img"></span><span class="vtag" id="vtag"></span></span>
       <div class="top-r">
-        <span class="pill"><span class="dot"></span><span id="pName"></span></span>
+        <span class="pill" title="Conectado en vivo con tu pareja"><span class="dot" id="netDot"></span><span id="pName"></span></span>
         <button class="iconbtn" id="openSettings" aria-label="Ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       </div>
     </header>
@@ -569,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.14';
+const VERSION='beta 0.15';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -712,6 +713,76 @@ if(!S.partner)S.partner='Mi pareja';
 const blobs={};
 function save(){try{localStorage.setItem('tp-state',JSON.stringify(S))}catch(e){}}
 
+/* =========================================================
+   RED — vínculo real entre los dos teléfonos (WebRTC vía PeerJS)
+   ========================================================= */
+const NET={peer:null,conn:null,ready:false,id:null,onHello:null,onSignal:null,onState:null,retryT:null};
+function loadPeerJS(){
+  if(window.Peer)return Promise.resolve();
+  if(NET._loading)return NET._loading;
+  return NET._loading=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('No se pudo cargar la conexión. Revisá internet.'));document.head.appendChild(s)});
+}
+function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}}
+function netWire(conn){
+  NET.conn=conn;NET.remotePeerId=conn.peer;
+  if(conn.open){NET.ready=true;netOnStatus(true)}
+  conn.on('open',()=>{NET.ready=true;netOnStatus(true);NET.onPairConnect&&NET.onPairConnect()});
+  conn.on('data',d=>{
+    if(!d||!d.type)return;
+    if(d.type==='hello'&&NET.onHello)NET.onHello(d);
+    else if(d.type==='signal'&&NET.onSignal)NET.onSignal(d);
+    else if(d.type==='touch'&&NET.onTouch)NET.onTouch(d);
+    else if(d.type==='beat'&&NET.onBeat)NET.onBeat(d);
+    else if(d.type==='state'&&NET.onState)NET.onState(d);
+  });
+  conn.on('close',()=>{NET.ready=false;netOnStatus(false);netScheduleReconnect()});
+  conn.on('error',()=>{NET.ready=false;netOnStatus(false)});
+}
+function netOnStatus(on){
+  const d=$('#netDot');if(d)d.classList.toggle('on',on);
+}
+function netScheduleReconnect(){
+  clearTimeout(NET.retryT);
+  if(!S.paired||!S.partnerPeerId)return;
+  NET.retryT=setTimeout(()=>netConnectToPartner(),4000);
+}
+async function netHost(code,cb){
+  await loadPeerJS();
+  if(NET.peer)try{NET.peer.destroy()}catch(e){}
+  const id='tp9-'+code;
+  const p=new Peer(id,{debug:0});
+  NET.peer=p;NET.id=id;
+  p.on('open',()=>cb&&cb(null,id));
+  p.on('connection',conn=>{conn.on('open',()=>{});netWire(conn)});
+  p.on('error',e=>cb&&cb(e));
+}
+async function netJoin(code,cb){
+  await loadPeerJS();
+  if(NET.peer)try{NET.peer.destroy()}catch(e){}
+  const p=new Peer({debug:0});
+  NET.peer=p;
+  p.on('open',myId=>{
+    NET.id=myId;
+    const conn=p.connect('tp9-'+code,{reliable:true});
+    let settled=false;
+    conn.on('open',()=>{settled=true;netWire(conn);cb&&cb(null,myId)});
+    conn.on('error',e=>{if(!settled){settled=true;cb&&cb(e)}});
+    setTimeout(()=>{if(!settled){settled=true;cb&&cb(new Error('timeout'))}},9000);
+  });
+  p.on('error',e=>cb&&cb(e));
+}
+function netConnectToPartner(){
+  if(!S.paired||!S.partnerPeerId||!S.myPeerId)return;
+  loadPeerJS().then(()=>{
+    if(NET.peer&&NET.peer.id)return; // ya hay un peer activo
+    const p=new Peer(S.myPeerId,{debug:0});
+    NET.peer=p;
+    p.on('open',()=>{const c=p.connect(S.partnerPeerId,{reliable:true});netWire(c)});
+    p.on('connection',conn=>netWire(conn));
+    p.on('error',()=>netScheduleReconnect());
+  });
+}
+
 function applySkin(){
   const r=document.documentElement,sk=SKINS[S.skin];
   TOK.forEach(p=>r.style.removeProperty('--'+p));r.style.removeProperty('color-scheme');
@@ -827,23 +898,31 @@ function obGo(step){
   if(step==='create'){
     const AL='ABCDEFGHJKMNPQRSTUVWXYZ23456789';ob.code=Array.from({length:6},()=>AL[Math.floor(Math.random()*AL.length)]).join('');
     const pretty=ob.code.slice(0,3)+' '+ob.code.slice(3);
+    ob.myId=null;ob.gaveUp=false;
     P.innerHTML=`<div class="ob-panel">${dots(1)}
       <h1>Tu código de vínculo</h1>
-      <p class="lead">Pasáselo a tu pareja. Lo ingresa en su teléfono desde “Tengo un código”.</p>
+      <p class="lead">Pasáselo a tu pareja. Lo ingresa en su teléfono desde “Tengo un código”. Dejá esta pantalla abierta hasta que se conecte.</p>
       <div class="code" id="obCode">${pretty}</div>
       <div class="row"><button class="btn soft full" id="obCopy">Copiar código</button></div>
-      <div class="waiting"><span class="spin"></span><span>Esperando a tu pareja · vence en <b id="obT" style="font-variant-numeric:tabular-nums">10:00</b></span></div>
-      <button class="btn soft full" id="obSim">Mi pareja ya ingresó el código</button>
+      <div class="waiting" id="obWait"><span class="spin"></span><span>Esperando a tu pareja · vence en <b id="obT" style="font-variant-numeric:tabular-nums">10:00</b></span></div>
+      <div class="err" id="obErr"></div>
       <button class="btn ghost full" id="obBack">Cancelar</button></div>`;
-    let left=600;ob.timer=setInterval(()=>{left--;const e=$('#obT');if(!e||left<0)return clearInterval(ob.timer);e.textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0')},1000);
+    let left=600;ob.timer=setInterval(()=>{left--;const e=$('#obT');if(!e||left<0){clearInterval(ob.timer);if(left<0&&!ob.gaveUp){ob.gaveUp=true;$('#obWait')&&($('#obWait').innerHTML='El código venció.');$('#obErr').textContent='Generá un código nuevo e intentá de nuevo.';if(NET.peer)try{NET.peer.destroy()}catch(err){}}}else e.textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0')},1000);
     $('#obCopy').onclick=()=>{const done=()=>{toast('Código copiado')};try{navigator.clipboard.writeText(ob.code).then(done,()=>{selectText($('#obCode'));toast('Seleccionado, copialo manualmente')})}catch(e){selectText($('#obCode'))}};
-    $('#obSim').onclick=()=>{field.flare();obGo('confirm')};
-    $('#obBack').onclick=()=>obGo('welcome');
+    $('#obBack').onclick=()=>{if(NET.peer)try{NET.peer.destroy()}catch(e){}obGo('welcome')};
+    netHost(ob.code,err=>{
+      if(ob.step!=='create')return;
+      if(err){$('#obErr').textContent='No se pudo esperar la conexión. Revisá internet e intentá de nuevo.';return}
+      ob.myId='tp9-'+ob.code;
+      NET.onPairConnect=()=>{if(ob.step==='create'){clearInterval(ob.timer);field.flare();obGo('confirm')}};
+      if(NET.conn&&NET.conn.open)NET.onPairConnect();
+      else NET.conn=null;
+    });
   }
   if(step==='join'){
     P.innerHTML=`<div class="ob-panel">${dots(1)}
       <h1>Ingresá el código</h1>
-      <p class="lead">Son seis letras y números que aparecen en el teléfono de tu pareja.</p>
+      <p class="lead">Son seis letras y números que aparecen en el teléfono de tu pareja. Tiene que tener esta pantalla abierta.</p>
       <input class="input code" id="obIn" maxlength="7" placeholder="ABC 123" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" aria-label="Código de vínculo">
       <div class="err" id="obErr"></div>
       <button class="btn lg full" id="obFind" disabled>Buscar a mi pareja</button>
@@ -851,8 +930,16 @@ function obGo(step){
     const i=$('#obIn');i.focus();
     i.oninput=()=>{let v=i.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);i.value=v.length>3?v.slice(0,3)+' '+v.slice(3):v;$('#obFind').disabled=v.length<6;$('#obErr').textContent=''};
     i.onkeydown=e=>{if(e.key==='Enter'&&!$('#obFind').disabled)$('#obFind').click()};
-    $('#obFind').onclick=()=>{const b=$('#obFind');b.disabled=true;b.innerHTML='<span class="spin" style="border-top-color:var(--bg)"></span> Buscando';setTimeout(()=>{field.flare();obGo('confirm')},1100)};
-    $('#obBack').onclick=()=>obGo('welcome');
+    $('#obFind').onclick=()=>{
+      const b=$('#obFind');b.disabled=true;b.innerHTML='<span class="spin" style="border-top-color:var(--bg)"></span> Buscando';
+      const code=i.value.replace(/[^A-Z0-9]/g,'');ob.code=code;
+      netJoin(code,(err,myId)=>{
+        if(ob.step!=='join')return;
+        if(err){b.disabled=false;b.textContent='Buscar a mi pareja';$('#obErr').textContent='No encontramos ese código. Pedile a tu pareja que lo tenga abierto y probá de nuevo.';return}
+        ob.myId=myId;field.flare();obGo('confirm');
+      });
+    };
+    $('#obBack').onclick=()=>{if(NET.peer)try{NET.peer.destroy()}catch(e){}obGo('welcome')};
   }
   if(step==='confirm'){
     P.innerHTML=`<div class="ob-panel">${dots(2)}
@@ -861,7 +948,7 @@ function obGo(step){
       <button class="btn lg full" id="obOk">Es mi pareja</button>
       <button class="btn ghost full" id="obNo">No es mi pareja</button></div>`;
     $('#obOk').onclick=()=>obGo('color');
-    $('#obNo').onclick=()=>obGo('welcome');
+    $('#obNo').onclick=()=>{if(NET.peer)try{NET.peer.destroy()}catch(e){}obGo('welcome')};
   }
   if(step==='color'){
     if(!S.prefs.myColor){S.prefs.myColor='coral';applySkin()}
@@ -898,6 +985,9 @@ function bond(){
   vib(20);
   field.bondTo(1,2600,()=>{
     field.shock();vib([40,60,80]);
+    NET.onPairConnect=null;
+    S.myPeerId=ob.myId||NET.id||null;
+    S.partnerPeerId=ob.mode==='create'?NET.remotePeerId:('tp9-'+ob.code);
     S.paired=true;S.pairedAt=TODAYS;save();
     P.innerHTML=`<div class="ob-panel bonded-msg">
       <span class="label">Correlación 1.00</span>
@@ -921,7 +1011,8 @@ function enterApp(){
 function send(text,btn){
   text=text.trim();if(!text)return;
   S.feed.unshift({from:'m',text,t:Date.now()});S.feed=S.feed.slice(0,60);save();
-  entangle();toast('Enviado a '+S.partner);renderFeed();
+  netSend({type:'signal',text});
+  entangle();toast(NET.ready?'Enviado a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora');renderFeed();
   if(btn){btn.classList.add('sent');setTimeout(()=>btn.classList.remove('sent'),700)}
 }
 function receive(text){S.feed.unshift({from:'p',text,t:Date.now()});save();entangle();push(S.partner,text);renderFeed()}
@@ -1014,13 +1105,14 @@ function sendTap(){
   hint(tapN>1?tapN+' toques':'Toque enviado · el teléfono de '+S.partner+' vibra');
   clearTimeout(tapTO);tapTO=setTimeout(()=>{
     const n=tapN;tapN=0;S.feed.unshift({from:'m',text:n>1?n+' toques':'Un toque',t:Date.now()});save();renderFeed();
+    netSend({type:'touch',n});
   },1200);
 }
 function bindTouch(){
   const cv=$('#field');if(!cv||!field)return;
   let holdTO=null,beatIv=null,holdStart=0,holding=false,downIdx=-1;
   const endHold=()=>{clearTimeout(holdTO);clearInterval(beatIv);if(field)field.hold(-1);
-    if(holding){holding=false;const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
+    if(holding){holding=false;const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();netSend({type:'beat',secs});hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
   cv.addEventListener('pointerdown',e=>{
     downIdx=field.hit(e.clientX,e.clientY);
     if(downIdx===0){field.ripple(0);vib(8);hint('Esa sos vos. Tocá a '+S.partner);return}
@@ -2083,7 +2175,7 @@ $('#openSettings').onclick=()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
       $('#si').onclick=()=>{const keep={skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
     $('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
-      $('#no').onclick=closeSheet;$('#si').onclick=()=>{S.paired=false;S.pairedAt=null;save();closeSheet();if(field){field.stop();field=null}showOnboard()}});
+      $('#no').onclick=closeSheet;$('#si').onclick=()=>{S.paired=false;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();if(field){field.stop();field=null}showOnboard()}});
   });
 };
 
@@ -2098,9 +2190,13 @@ new MutationObserver(readColors).observe(document.documentElement,{attributes:tr
 /* arranque */
 applySkin();
 mfLoadSaved();
+NET.onSignal=d=>receive(d.text);
+NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();vib(d.n>1?[18,60,18,60,18]:14);entangle();push(S.partner,'te tocó');renderFeed&&renderFeed()};
+NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();vib([40,70,40,70,40]);entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');renderFeed&&renderFeed()};
 if(S.paired){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
+  if(S.myPeerId&&S.partnerPeerId)netConnectToPartner();
 }else showOnboard();
 })();
 </script>
