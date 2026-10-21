@@ -511,6 +511,32 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .touch-hint span{display:inline-block}
 .touch-hint.live span{animation:hintIn .35s var(--spring)}
 @keyframes hintIn{from{transform:translateY(4px);opacity:.3}}
+/* mi letra */
+.mk-hand{display:flex;gap:12px;align-items:center;text-align:left;padding:12px 14px;border-radius:16px;background:var(--glass-bg);border:1px dashed var(--hi2);box-shadow:inset 0 1px 0 var(--hi)}
+.mk-hand>span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mk-ic{width:38px;height:38px;border-radius:12px;background:var(--a);color:var(--bg);display:grid;place-items:center;flex:none}
+.mk-ic svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linejoin:round}
+.fw{position:fixed;inset:0;z-index:70;background:var(--bg);overflow:auto;animation:fade .25s;
+  padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.fw-in{max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:16px;min-height:100%}
+.fw-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.fw-prog{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.fw-prog i{display:block;height:100%;background:var(--a);transition:width .4s var(--ease)}
+.fw-ask{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.fw-char{font-family:var(--f-display);font-weight:600;font-size:64px;line-height:1;letter-spacing:-.02em}
+.fw-pad{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:1/1;max-width:100%;box-shadow:inset 0 0 0 1px var(--hi2),var(--glass-sh)}
+.paper-bg{background:#fbf6ea}
+.fw-pad canvas{display:block;width:100%;height:100%;touch-action:none}
+.fw-status{position:absolute;left:12px;right:12px;bottom:10px;text-align:center;font-size:13px;font-weight:600;color:#6b6152}
+.fw-actions{display:flex;flex-direction:column;gap:10px;margin-top:auto}
+.fw-actions.row{flex-direction:row}
+.fw-sample{display:flex;gap:10px;justify-content:center;padding:14px;border-radius:18px;background:#fbf6ea;font-family:'Caveat',cursive;font-size:40px;color:#23408e}
+.fw-preview .ptext{min-height:0}
+.mf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px}
+.mf-cell{aspect-ratio:1;max-width:100%;min-width:0;overflow:hidden;border-radius:10px;background:#fbf6ea;display:grid;place-items:center;padding:6px;color:#9a8f7b;font-weight:700;font-size:16px;border:1px solid var(--hi2)}
+.mf-cell img{width:100%;height:100%;object-fit:contain;filter:brightness(0) saturate(100%)}
+.mf-cell.empty{background:transparent;border-style:dashed;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--a)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -543,7 +569,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <script>
 (function(){
-const VERSION='beta 0.10';
+const VERSION='beta 0.11';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -637,6 +663,7 @@ const ICON={
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   left:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
   right:'<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  pen:'<svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>',
   bell:'<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>'
 };
 
@@ -1569,12 +1596,14 @@ function pickHand(after,first){
   let h=S.prefs.hand||'caveat',ink=S.prefs.ink||'azul';
   sheet(`<h2>${first?'Antes de tu primera carta: elegí tu letra':'Tu letra'}</h2>
     <p class="sub">Así se ven las cartas que escribís desde el teléfono. La podés cambiar cuando quieras desde Ajustes.</p>
+    <button class="mk-hand" id="mkHand"><span class="mk-ic">${ICON.pen}</span><span><b>${HANDS.mine?'Rehacer mi letra':'Crear una tipografía con mi letra'}</b><span class="sub">${HANDS.mine?'Rehacé letras o cambiá el grosor':'Escaneá tu letra con fotos o dibujala con el dedo'}</span></span></button>
     <div class="hands" id="hands">${Object.entries(HANDS).map(([k,H])=>`<button class="hand ${k===h?'on':''}" data-h="${k}" aria-pressed="${k===h}"><span class="paper-mini" style="${handStyle(k,ink)}">Te extraño, nos vemos a la noche.</span><span class="hand-n">${H.n}</span></button>`).join('')}</div>
     <div class="field"><span class="flabel">Tinta</span><div class="chips" id="inks">${Object.entries(INKS).map(([k,I])=>`<button class="chip ${k===ink?'on':''}" data-i="${k}" aria-pressed="${k===ink}"><span class="inkdot" style="background:${I.c}"></span>${I.n}</button>`).join('')}</div></div>
     <button class="btn full" id="hOk">Usar esta letra</button>`,()=>{
     const paint=()=>{document.querySelectorAll('.hand').forEach(b=>{b.classList.toggle('on',b.dataset.h===h);b.setAttribute('aria-pressed',b.dataset.h===h);b.querySelector('.paper-mini').setAttribute('style',handStyle(b.dataset.h,ink))});document.querySelectorAll('#inks [data-i]').forEach(b=>{b.classList.toggle('on',b.dataset.i===ink);b.setAttribute('aria-pressed',b.dataset.i===ink)})};
     document.querySelectorAll('.hand').forEach(b=>b.onclick=()=>{h=b.dataset.h;paint()});
     document.querySelectorAll('#inks [data-i]').forEach(b=>b.onclick=()=>{ink=b.dataset.i;paint()});
+    $('#mkHand').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#hOk').onclick=()=>{S.prefs.hand=h;S.prefs.ink=ink;save();toast('Letra guardada');after?after():closeSheet()};
   });
 }
@@ -1648,6 +1677,267 @@ function compose(kind0){
   });
 }
 
+/* =========================================================
+   MI LETRA: escanear la letra de la persona y armar una tipografía
+   ========================================================= */
+const MF={
+  FAMILY:'TPMiLetra',X:470,C:700,D:-230,
+  LOWER:'abcdefghijklmnñopqrstuvwxyz',UPPER:'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ',DIGITS:'0123456789',PUNCT:'.,;:¿?¡!\'"()-',MARKS:'´¨',SYM:'@#$%&*+=/_°€<>«»♥',
+  glyphs:{},face:null
+};
+try{MF.glyphs=JSON.parse(localStorage.getItem('tp-glyphs')||'{}')||{}}catch(e){MF.glyphs={}}
+const saveGlyphs=()=>{try{localStorage.setItem('tp-glyphs',JSON.stringify(MF.glyphs))}catch(e){toast('No hay espacio para guardar más letras')}};
+const mfChars=set=>[...MF.LOWER,...(set==='full'?MF.UPPER:''),...MF.DIGITS,...MF.PUNCT,...MF.MARKS,...(set==='full'?MF.SYM:'')];
+const mfKind=ch=>MF.LOWER.includes(ch)?'minúscula':MF.UPPER.includes(ch)?'mayúscula':MF.DIGITS.includes(ch)?'número':ch==='´'?'tilde (para armar á é í ó ú)':ch==='¨'?'diéresis (para armar la ü)':MF.SYM.includes(ch)?'símbolo':'signo';
+function mfMetrics(ch){
+  const {X,C,D}=MF;
+  if('acemnorsuvwxz'.includes(ch))return[X,0];
+  if('bdfhkl'.includes(ch))return[C,0];
+  if(ch==='t')return[620,0];
+  if('gpqy'.includes(ch))return[X,D];
+  if(ch==='j')return[640,D];
+  if(ch==='i'||ch==='ñ')return[640,0];
+  if(ch==='Q')return[C,-60];
+  if(ch==='Ñ')return[C+170,0];
+  if(MF.UPPER.includes(ch)||MF.DIGITS.includes(ch)||ch==='!'||ch==='?')return[C,0];
+  return({'.':[90,0],',':[90,-130],';':[X,-130],':':[X-30,0],'¿':[X+40,D],'¡':[X+40,D],"'":[C,C-220],'"':[C,C-220],'(':[C+30,-170],')':[C+30,-170],'-':[290,230],'´':[160,0],'¨':[90,0],'_':[-50,-120],'/':[C,-80],'@':[X+90,-140],'#':[C-40,0],'$':[C+60,-90],'%':[C,0],'&':[C,0],'*':[C,C-260],'+':[X+40,40],'=':[X-40,110],'°':[C,C-210],'€':[C,0],'<':[X+40,20],'>':[X+40,20],'«':[X,60],'»':[X,60],'♥':[C-60,0]})[ch]||[C,0];
+}
+function loadOT(){
+  if(window.opentype)return Promise.resolve();
+  return new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js';s.onload=res;s.onerror=()=>rej(new Error('No se pudo cargar el generador de tipografías. Revisá la conexión.'));document.head.appendChild(s)});
+}
+/* ---- imagen → tinta ---- */
+function mfComponents(b,w,h){
+  const seen=new Uint8Array(w*h),out=[],q=new Int32Array(w*h);
+  for(let i=0;i<w*h;i++){if(!b[i]||seen[i])continue;let qs=0,qe=0;q[qe++]=i;seen[i]=1;const c={px:[],x0:w,y0:h,x1:0,y1:0};
+    while(qs<qe){const p=q[qs++],x=p%w,y=(p/w)|0;c.px.push(p);if(x<c.x0)c.x0=x;if(x>c.x1)c.x1=x;if(y<c.y0)c.y0=y;if(y>c.y1)c.y1=y;
+      const nb=[x>0?p-1:-1,x<w-1?p+1:-1,y>0?p-w:-1,y<h-1?p+w:-1];for(const n of nb)if(n>=0&&b[n]&&!seen[n]){seen[n]=1;q[qe++]=n}}
+    c.size=c.px.length;out.push(c)}
+  return out;
+}
+function mfCrop(b,w,h,keep){
+  let x0=w,y0=h,x1=-1,y1=-1;keep.forEach(c=>{x0=Math.min(x0,c.x0);y0=Math.min(y0,c.y0);x1=Math.max(x1,c.x1);y1=Math.max(y1,c.y1)});
+  if(x1<0)return null;const pad=1;x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(w-1,x1+pad);y1=Math.min(h-1,y1+pad);
+  const W=x1-x0+1,H=y1-y0+1,o=new Uint8Array(W*H);keep.forEach(c=>c.px.forEach(p=>{const x=p%w-x0,y=((p/w)|0)-y0;o[y*W+x]=1}));
+  return{data:o,w:W,h:H};
+}
+function mfProcessPhoto(img,sens){
+  const M=700;let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;const f=Math.min(1,M/Math.max(w,h));w=Math.max(1,Math.round(w*f));h=Math.max(1,Math.round(h*f));
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');x.drawImage(img,0,0,w,h);
+  const d=x.getImageData(0,0,w,h).data,g=new Float32Array(w*h);for(let i=0;i<w*h;i++)g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+  const I=new Float64Array((w+1)*(h+1));for(let y=0;y<h;y++){let row=0;for(let xx=0;xx<w;xx++){row+=g[y*w+xx];I[(y+1)*(w+1)+xx+1]=I[y*(w+1)+xx+1]+row}}
+  const r=Math.max(6,Math.round(Math.min(w,h)/10)),k=.22-.18*sens,b=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++){const ax=Math.max(0,xx-r),ay=Math.max(0,y-r),bx=Math.min(w,xx+r+1),by=Math.min(h,y+r+1);
+    const m=(I[by*(w+1)+bx]-I[ay*(w+1)+bx]-I[by*(w+1)+ax]+I[ay*(w+1)+ax])/((bx-ax)*(by-ay));const v=g[y*w+xx];b[y*w+xx]=v<m*(1-k)&&v<205?1:0}
+  let comps=mfComponents(b,w,h);
+  const total=comps.reduce((s,c)=>s+c.size,0);
+  comps=comps.filter(c=>!((c.x0===0||c.y0===0||c.x1===w-1||c.y1===h-1)&&c.size<total*.4));
+  if(!comps.length)return null;
+  const big=comps.reduce((a,c)=>c.size>a.size?c:a);
+  const bw=big.x1-big.x0,bh=big.y1-big.y0,cx0=big.x0-bw*1.2-20,cx1=big.x1+bw*1.2+20,cy0=big.y0-bh*1.2-20,cy1=big.y1+bh*1.2+20;
+  const keep=comps.filter(c=>c.size>=Math.max(10,big.size*.012)&&c.x1>cx0&&c.x0<cx1&&c.y1>cy0&&c.y0<cy1);
+  return mfCrop(b,w,h,keep);
+}
+function mfToPng(bm){const c=document.createElement('canvas');c.width=bm.w;c.height=bm.h;const x=c.getContext('2d'),im=x.createImageData(bm.w,bm.h);for(let i=0;i<bm.data.length;i++)if(bm.data[i])im.data[i*4+3]=255;x.putImageData(im,0,0);return c.toDataURL('image/png')}
+function mfFromPng(url){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,im.width,im.height).data,o=new Uint8Array(im.width*im.height);for(let i=0;i<o.length;i++)o[i]=d[i*4+3]>127?1:0;res({data:o,w:im.width,h:im.height})};im.onerror=rej;im.src=url})}
+function mfDilate(bm,n){let {data,w,h}=bm;for(let k=0;k<n;k++){const W=w+2,H=h+2,o=new Uint8Array(W*H);for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(data[y*w+x])for(let dy=0;dy<3;dy++)for(let dx=0;dx<3;dx++)o[(y+dy)*W+x+dx]=1;data=o;w=W;h=H}return{data,w,h,grow:n}}
+function mfScale(bm,maxH){if(bm.h<=maxH)return{...bm,f:1};const f=maxH/bm.h,W=Math.max(1,Math.ceil(bm.w*f)),H=maxH,o=new Uint8Array(W*H);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const sx0=Math.floor(x/f),sx1=Math.max(sx0+1,Math.floor((x+1)/f)),sy0=Math.floor(y/f),sy1=Math.max(sy0+1,Math.floor((y+1)/f));let s=0,n=0;
+    for(let yy=sy0;yy<sy1&&yy<bm.h;yy++)for(let xx=sx0;xx<sx1&&xx<bm.w;xx++){s+=bm.data[yy*bm.w+xx];n++}o[y*W+x]=n&&s/n>=.42?1:0}
+  return{data:o,w:W,h:H,f}}
+/* ---- tinta → contornos ---- */
+function mfTrace(bm){
+  const {data:b,w,h}=bm,W1=w+1,nx=new Map();
+  const at=(x,y)=>x>=0&&y>=0&&x<w&&y<h&&b[y*w+x];
+  const add=(x0,y0,x1,y1)=>{const k=y0*W1+x0,v=y1*W1+x1,a=nx.get(k);a?a.push(v):nx.set(k,[v])};
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(b[y*w+x]){if(!at(x,y-1))add(x,y,x+1,y);if(!at(x+1,y))add(x+1,y,x+1,y+1);if(!at(x,y+1))add(x+1,y+1,x,y+1);if(!at(x-1,y))add(x,y+1,x,y)}
+  const loops=[];
+  for(const [k,arr] of nx){while(arr.length){let prev=k,cur=arr.pop();const pts=[[k%W1,(k/W1)|0]];let guard=0;
+    while(cur!==k&&guard++<200000){pts.push([cur%W1,(cur/W1)|0]);const c=nx.get(cur);if(!c||!c.length)break;let pick=0;
+      if(c.length>1){const dx=cur%W1-prev%W1,dy=((cur/W1)|0)-((prev/W1)|0);pick=c.findIndex(v=>v%W1-cur%W1===-dy&&((v/W1)|0)-((cur/W1)|0)===dx);if(pick<0)pick=0}
+      prev=cur;cur=c.splice(pick,1)[0]}
+    let area=0;for(let i=0;i<pts.length;i++){const a=pts[i],c2=pts[(i+1)%pts.length];area+=a[0]*c2[1]-c2[0]*a[1]}
+    if(Math.abs(area)>=6)loops.push(mfSimplify(pts,.9))}}
+  return loops;
+}
+function mfRdp(p,eps){if(p.length<3)return p;const [ax,ay]=p[0],[bx,by]=p[p.length-1],L=Math.hypot(bx-ax,by-ay)||1;let mi=0,md=0;
+  for(let i=1;i<p.length-1;i++){const d=Math.abs((bx-ax)*(ay-p[i][1])-(ax-p[i][0])*(by-ay))/L;if(d>md){md=d;mi=i}}
+  if(md>eps){const a=mfRdp(p.slice(0,mi+1),eps),b=mfRdp(p.slice(mi),eps);return a.slice(0,-1).concat(b)}return[p[0],p[p.length-1]]}
+function mfSimplify(pts,eps){if(pts.length<8)return pts;let k=0,md=0;pts.forEach((q,i)=>{const d=(q[0]-pts[0][0])**2+(q[1]-pts[0][1])**2;if(d>md){md=d;k=i}});
+  const a=mfRdp(pts.slice(0,k+1),eps),b=mfRdp(pts.slice(k).concat([pts[0]]),eps);return a.slice(0,-1).concat(b.slice(0,-1))}
+function mfAddLoops(path,loops,map){
+  loops.forEach(lp=>{if(lp.length<3)return;const P=lp.map(map),n=P.length,mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    const m0=mid(P[n-1],P[0]);path.moveTo(m0[0],m0[1]);
+    for(let i=0;i<n;i++){const c=P[i],m=mid(P[i],P[(i+1)%n]);path.quadraticCurveTo(c[0],c[1],m[0],m[1])}
+    path.close()});
+}
+/* la i y la j sin punto, para ponerles tilde */
+function mfNoDot(bm){const cs=mfComponents(bm.data,bm.w,bm.h);if(cs.length<2)return bm;const big=cs.reduce((a,c)=>c.size>a.size?c:a);
+  const keep=cs.filter(c=>c===big||!(c.y1<big.y0+(big.y1-big.y0)*.15&&c.size<big.size*.5));return mfCrop(bm.data,bm.w,bm.h,keep)||bm}
+/* ---- armar la tipografía ---- */
+async function mfBuild(thick){
+  await loadOT();
+  const SIDE=55,cache={};
+  const prep=async ch=>{if(cache[ch])return cache[ch];const r=MF.glyphs[ch];if(!r)return null;let bm=await mfFromPng(r.png);const h0=bm.h;bm=mfDilate(bm,thick);const s=mfScale(bm,170);
+    const met=r.top!=null?[r.top,r.bottom]:mfMetrics(ch);const grow=(met[0]-met[1])/h0*thick;   // el trazo crece hacia afuera sin mover la letra
+    return cache[ch]={bm:s,loops:mfTrace(s),top:met[0]+grow,bottom:met[1]-grow,special:ch==='-'?'dash':null}};
+  const place=(g,top,bottom)=>{const s=(top-bottom)/g.bm.h;return{s,aw:SIDE*2+g.bm.w*s,map:p=>[SIDE+p[0]*s,top-p[1]*s]}};
+  const glyphs=[new opentype.Glyph({name:'.notdef',unicode:0,advanceWidth:500,path:new opentype.Path()}),new opentype.Glyph({name:'space',unicode:32,advanceWidth:280,path:new opentype.Path()})];
+  const made={};
+  const make=(ch,g,top,bottom,extra,awOver)=>{let pl;
+    if(g.special==='dash'){const s=300/g.bm.w,cy=260;pl={s,aw:SIDE*2+300,map:p=>[SIDE+p[0]*s,cy+(g.bm.h/2-p[1])*s]}}else pl=place(g,top,bottom);
+    const path=new opentype.Path();mfAddLoops(path,g.loops,pl.map);extra&&extra(path,pl);
+    glyphs.push(new opentype.Glyph({name:'u'+ch.codePointAt(0).toString(16),unicode:ch.codePointAt(0),advanceWidth:Math.round(awOver||pl.aw),path}));made[ch]=pl};
+  const all=[...MF.LOWER,...MF.UPPER,...MF.DIGITS,...MF.PUNCT,...MF.SYM];
+  for(const ch of all){
+    let g=await prep(ch);
+    if(g){make(ch,g,g.top,g.bottom);continue}
+    if(MF.UPPER.includes(ch)){const lo=await prep(ch.toLowerCase());if(lo)make(ch,lo,Math.min(MF.C,lo.top*1.42),lo.bottom)}
+  }
+  const compose=async(markCh,pairs,mh)=>{
+    const ac=await prep(markCh);if(!ac)return;
+    for(const [acc,base] of Object.entries(pairs)){
+      let g=await prep(base),top,bottom;
+      if(!g&&MF.UPPER.includes(base)){const lo=await prep(base.toLowerCase());if(lo){g=lo;top=Math.min(MF.C,lo.top*1.42);bottom=lo.bottom}}
+      if(!g)continue;
+      if(top==null){top=g.top;bottom=g.bottom}
+      if(base==='i'){const nb=mfScale(mfNoDot(g.bm),170);g={...g,bm:nb,loops:mfTrace(nb)};top=MF.X}
+      const capTop=MF.UPPER.includes(base)?top:Math.min(top,MF.X+20);
+      make(acc,g,top,bottom,(path,pl)=>{const s=mh/ac.bm.h,aw=ac.bm.w*s,x0=pl.aw/2-aw/2+(markCh==='´'?20:0),y0=capTop+60+mh;mfAddLoops(path,ac.loops,p=>[x0+p[0]*s,y0-p[1]*s])});
+    }
+  };
+  await compose('´',{'á':'a','é':'e','í':'i','ó':'o','ú':'u','Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U'},150);
+  await compose('¨',{'ü':'u','Ü':'U','ï':'i'},95);
+  // signos que el teclado del celular cambia solo
+  const alias={'’':"'",'‘':"'",'´':"'",'“':'"','”':'"','–':'-','—':'-','′':"'",'″':'"'};
+  for(const [a,src] of Object.entries(alias)){if(made[a])continue;const g=await prep(src);if(g)make(a,g,g.top,g.bottom)}
+  const dot=await prep('.');
+  if(dot){make('…',dot,dot.top,dot.bottom,(path,pl)=>{for(let k=1;k<3;k++)mfAddLoops(path,dot.loops,p=>{const q=pl.map(p);return[q[0]+k*(pl.aw-40),q[1]]})},(pl=>pl)(null)||undefined);
+    const pl=made['…'];glyphs[glyphs.length-1].advanceWidth=Math.round(pl.aw*3-80)}
+  const font=new opentype.Font({familyName:MF.FAMILY,styleName:'Regular',unitsPerEm:1000,ascender:950,descender:-300,glyphs});
+  return font.toArrayBuffer();
+}
+const b64=buf=>{const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=32768)s+=String.fromCharCode.apply(null,u.subarray(i,i+32768));return btoa(s)};
+const unb64=s=>{const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer};
+async function mfInstall(buf){
+  try{if(MF.face)document.fonts.delete(MF.face)}catch(e){}
+  const fam=MF.FAMILY+'-'+Date.now().toString(36);   // nombre nuevo en cada armado para que el navegador no use la versión anterior
+  const ff=new FontFace(fam,buf);await ff.load();document.fonts.add(ff);MF.face=ff;
+  HANDS.mine={n:'Mi letra',f:`'${fam}', 'Caveat', cursive`,s:30};
+}
+function mfLoadSaved(){
+  let s=null;try{s=localStorage.getItem('tp-font')}catch(e){}
+  if(!s)return;
+  HANDS.mine={n:'Mi letra',f:"'Caveat', cursive",s:30};
+  mfInstall(unb64(s)).then(()=>{if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}).catch(()=>{});
+}
+
+/* ---- asistente ---- */
+let W=null;
+function mfOpen(){
+  const have=Object.keys(MF.glyphs).length;
+  W={set:have>mfChars('quick').length?'full':'quick',i:0,mode:'photo',sens:.5,src:null,thick:S.prefs.mfThick??0};
+  const el=document.createElement('div');el.className='fw';el.id='fw';el.setAttribute('role','dialog');el.setAttribute('aria-label','Crear mi letra');document.body.appendChild(el);
+  mfIntro();
+}
+function mfClose(){const el=$('#fw');if(el)el.remove();W=null}
+function mfFrame(body){const el=$('#fw');if(!el)return;el.innerHTML=`<div class="fw-in">${body}</div>`;const c=el.querySelector('#fwClose');if(c)c.onclick=mfClose}
+function mfIntro(){
+  const have=Object.keys(MF.glyphs).length,q=mfChars('quick').length,f=mfChars('full').length;
+  mfFrame(`<div class="fw-top"><span class="label">Mi letra</span><button class="iconbtn" id="fwClose" aria-label="Cerrar">${ICON.x}</button></div>
+    <h1>Convertí tu letra en una tipografía</h1>
+    <p class="lead">Te pedimos cada letra de a una. Escribila grande en un papel blanco, con lapicera oscura, y sacale una foto de cerca. Si preferís, la dibujás con el dedo en la pantalla.</p>
+    <div class="fw-sample"><span>a</span><span>b</span><span>c</span><span>ñ</span><span>?</span></div>
+    <div class="field"><span class="flabel">Qué querés escanear</span><div class="seg" id="mfSet">
+      <button data-s="quick" class="${W.set==='quick'?'on':''}">Rápido · ${q}</button><button data-s="full" class="${W.set==='full'?'on':''}">Con mayúsculas · ${f}</button></div>
+      <p class="sub">En “Rápido” las mayúsculas se arman agrandando tus minúsculas. Las vocales con tilde se arman solas.</p></div>
+    ${have?`<div class="note"><b>${have} letras guardadas.</b> Podés seguir donde quedaste o rehacer las que quieras.</div>`:''}
+    <div class="fw-actions">${have?`<button class="btn soft lg full" id="mfReview">Ver mis letras</button>`:''}<button class="btn lg full" id="mfStart">${have?'Seguir':'Empezar'}</button></div>`);
+  document.querySelectorAll('#mfSet [data-s]').forEach(b=>b.onclick=()=>{W.set=b.dataset.s;document.querySelectorAll('#mfSet [data-s]').forEach(x=>x.classList.toggle('on',x===b));const s=$('#mfStart');if(s)s.textContent=have?'Seguir':'Empezar'});
+  $('#mfStart').onclick=()=>{const cs=mfChars(W.set);const first=cs.findIndex(c=>!MF.glyphs[c]);W.i=first<0?0:first;if(first<0)return mfReview();mfStep()};
+  const r=$('#mfReview');if(r)r.onclick=mfReview;
+}
+const GUIDE={cap:.2,x:.44,base:.7,desc:.88};
+function mfDrawGuides(x,w,h){x.save();x.lineWidth=1;[['cap',.35],['x',.25],['base',.6],['desc',.25]].forEach(([k,a])=>{x.strokeStyle=hexA(C.muted,a);x.setLineDash(k==='base'?[]:[4,5]);x.beginPath();x.moveTo(10,GUIDE[k]*h);x.lineTo(w-10,GUIDE[k]*h);x.stroke()});x.restore()}
+function mfPaintRec(cv,rec,ch){
+  const dpr=Math.min(2,devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
+  mfDrawGuides(x,w,h);if(!rec)return;
+  const im=new Image();im.onload=()=>{const met=rec.top!=null?[rec.top,rec.bottom]:mfMetrics(ch);const u=(GUIDE.base-GUIDE.cap)*h/700;let gh,gw,gy;
+    if(ch==='-'){gw=Math.min(w*.5,300*u);gh=gw*rec.h/rec.w;gy=GUIDE.base*h-260*u-gh/2}else{gh=(met[0]-met[1])*u;gw=gh*rec.w/rec.h;gy=GUIDE.base*h-met[0]*u}
+    if(gw>w*.9){const f=w*.9/gw;gw*=f;gh*=f}
+    const o=document.createElement('canvas');o.width=Math.max(1,gw*dpr);o.height=Math.max(1,gh*dpr);const ox=o.getContext('2d');ox.drawImage(im,0,0,o.width,o.height);ox.globalCompositeOperation='source-in';ox.fillStyle=(INKS[S.prefs.ink]||INKS.azul).c;ox.fillRect(0,0,o.width,o.height);
+    x.drawImage(o,(w-gw)/2,gy,gw,gh)};im.src=rec.png;
+}
+function mfStep(){
+  const cs=mfChars(W.set),ch=cs[W.i],rec=MF.glyphs[ch],done=cs.filter(c=>MF.glyphs[c]).length;
+  W.src=null;
+  mfFrame(`<div class="fw-top"><button class="linkbtn" id="mfBack">${W.i?'‹ Anterior':'‹ Volver'}</button><span class="label">${W.i+1} de ${cs.length}</span><button class="iconbtn" id="fwClose" aria-label="Cerrar">${ICON.x}</button></div>
+    <div class="fw-prog"><i style="width:${done/cs.length*100}%"></i></div>
+    <div class="fw-ask"><span class="label">${esc(mfKind(ch))}</span><div class="fw-char">${ch==='´'?'´':esc(ch)}</div></div>
+    <div class="seg" id="mfMode"><button data-m="photo" class="${W.mode==='photo'?'on':''}">Foto</button><button data-m="draw" class="${W.mode==='draw'?'on':''}">Dibujar</button></div>
+    <div class="fw-pad paper-bg"><canvas id="mfCv"></canvas><span class="fw-status" id="mfStatus"></span></div>
+    <div id="mfTools"></div>
+    <div class="fw-actions row"><button class="btn soft" id="mfSkip" style="flex:1">${rec?'Dejar como está':'Saltear'}</button><button class="btn" id="mfNext" style="flex:2">${W.i===cs.length-1?'Terminar':'Siguiente'}</button></div>`);
+  $('#mfBack').onclick=()=>{if(W.i===0)return mfIntro();W.i--;mfStep()};
+  document.querySelectorAll('#mfMode [data-m]').forEach(b=>b.onclick=()=>{W.mode=b.dataset.m;mfStep()});
+  const go2=()=>{if(W.i>=cs.length-1)return mfReview();W.i++;mfStep()};
+  $('#mfSkip').onclick=go2;
+  const cv=$('#mfCv');
+  if(W.mode==='photo'){
+    mfPaintRec(cv,rec,ch);
+    $('#mfStatus').textContent=rec?'':'Todavía no hay foto de esta letra';
+    $('#mfTools').innerHTML=`<div class="row"><label class="btn soft filebtn" style="flex:1">Sacar foto<input type="file" id="mfCam" accept="image/*" capture="environment"></label><label class="btn soft filebtn" style="flex:1">Elegir de la galería<input type="file" id="mfGal" accept="image/*"></label></div>
+      <div class="field" id="mfSensF" hidden><label for="mfSens">Si se ve cortada, subí la sensibilidad. Si aparecen manchas, bajala.</label><input type="range" id="mfSens" min="0" max="1" step="0.05" value="${W.sens}"></div>`;
+    const run=()=>{if(!W.src)return;const r=mfProcessPhoto(W.src,W.sens);if(!r){$('#mfStatus').textContent='No encontramos la letra. Probá con más luz o más cerca.';return}
+      if(r.w*r.h>900*900){$('#mfStatus').textContent='Hay demasiada tinta en la foto. Probá encuadrando solo la letra.';return}
+      MF.glyphs[ch]={png:mfToPng(r),w:r.w,h:r.h};saveGlyphs();$('#mfStatus').textContent='';mfPaintRec(cv,MF.glyphs[ch],ch);$('#mfSkip').textContent='Dejar como está'};
+    const onFile=e=>{const f=e.target.files[0];if(!f)return;$('#mfStatus').textContent='Procesando…';const im=new Image();im.onload=()=>{W.src=im;$('#mfSensF').hidden=false;setTimeout(run,20)};im.onerror=()=>{$('#mfStatus').textContent='No se pudo abrir la foto.'};im.src=URL.createObjectURL(f)};
+    $('#mfCam').onchange=onFile;$('#mfGal').onchange=onFile;
+    let st;$('#mfSens').oninput=e=>{W.sens=+e.target.value;clearTimeout(st);st=setTimeout(run,120)};
+    $('#mfNext').onclick=()=>{if(!MF.glyphs[ch]){$('#mfStatus').textContent='Sacale una foto o tocá Saltear.';return}go2()};
+  }else{
+    const dpr=Math.min(2,devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);mfDrawGuides(x,w,h);
+    const ink=document.createElement('canvas');ink.width=w;ink.height=h;const ix=ink.getContext('2d');
+    [x,ix].forEach(c=>{c.lineCap='round';c.lineJoin='round';c.lineWidth=Math.max(5,h*.03);c.strokeStyle=(INKS[S.prefs.ink]||INKS.azul).c});ix.strokeStyle='#000';
+    let drawing=false,last=null,any=false;
+    $('#mfStatus').textContent=rec?'Ya guardaste esta letra. Si dibujás, se reemplaza.':'Dibujala apoyada en la línea de abajo';
+    cv.onpointerdown=e=>{drawing=true;any=true;$('#mfStatus').textContent='';const r=cv.getBoundingClientRect();last=[e.clientX-r.left,e.clientY-r.top];try{cv.setPointerCapture(e.pointerId)}catch(_){};[x,ix].forEach(c=>{c.beginPath();c.arc(last[0],last[1],c.lineWidth/2,0,7);c.fillStyle=c.strokeStyle;c.fill()})};
+    cv.onpointermove=e=>{if(!drawing)return;const r=cv.getBoundingClientRect(),p=[e.clientX-r.left,e.clientY-r.top];[x,ix].forEach(c=>{c.beginPath();c.moveTo(last[0],last[1]);c.lineTo(p[0],p[1]);c.stroke()});last=p};
+    cv.onpointerup=cv.onpointercancel=()=>{drawing=false};
+    $('#mfTools').innerHTML=`<button class="btn soft full" id="mfClear">Borrar y volver a dibujar</button>`;
+    $('#mfClear').onclick=()=>{any=false;mfStep()};
+    $('#mfNext').onclick=()=>{
+      if(any){const d=ix.getImageData(0,0,w,h).data,b=new Uint8Array(w*h);for(let i=0;i<w*h;i++)b[i]=d[i*4+3]>100?1:0;const cs2=mfComponents(b,w,h);const r=mfCrop(b,w,h,cs2);
+        if(r){const u=700/((GUIDE.base-GUIDE.cap)*h);let y0=h,y1=0;cs2.forEach(c=>{y0=Math.min(y0,c.y0);y1=Math.max(y1,c.y1)});
+          MF.glyphs[ch]={png:mfToPng(r),w:r.w,h:r.h,top:Math.round((GUIDE.base*h-y0)*u),bottom:Math.round((GUIDE.base*h-y1-1)*u)};saveGlyphs()}}
+      if(!MF.glyphs[ch]){$('#mfStatus').textContent='Dibujá la letra o tocá Saltear.';return}
+      go2()};
+  }
+}
+async function mfReview(){
+  const cs=mfChars(W.set),have=cs.filter(c=>MF.glyphs[c]).length,missing=cs.filter(c=>!MF.glyphs[c]&&!(MF.UPPER.includes(c)&&MF.glyphs[c.toLowerCase()]));
+  mfFrame(`<div class="fw-top"><button class="linkbtn" id="mfBack">‹ Volver</button><span class="label">${have} de ${cs.length} letras</span><button class="iconbtn" id="fwClose" aria-label="Cerrar">${ICON.x}</button></div>
+    <h2>Así quedó tu letra</h2>
+    <div class="sheet-paper fw-preview" id="mfPrev"><div class="ptext" id="mfPrevT">Armando tu tipografía…</div></div>
+    <div class="field"><span class="flabel">Grosor del trazo</span><div class="seg" id="mfThick" style="grid-template-columns:1fr 1fr 1fr">${[[0,'Como la foto'],[1,'Más grueso'],[2,'Mucho más']].map(([v,n])=>`<button data-t="${v}" class="${W.thick===v?'on':''}">${n}</button>`).join('')}</div></div>
+    ${missing.length?`<p class="sub">Faltan ${missing.length}: ${esc(missing.join(' '))}. Esas se van a ver con otra letra a mano.</p>`:''}
+    <div class="field"><span class="flabel">Tocá una letra para rehacerla</span><div class="mf-grid">${cs.map((c,i)=>`<button class="mf-cell ${MF.glyphs[c]?'':'empty'}" data-i="${i}" aria-label="Rehacer ${esc(c)}">${MF.glyphs[c]?`<img src="${MF.glyphs[c].png}" alt="">`:esc(c)}</button>`).join('')}</div></div>
+    <div class="err" id="mfErr"></div>
+    <div class="fw-actions"><button class="btn lg full" id="mfSave" disabled>Usar mi letra en las cartas</button></div>`);
+  $('#mfBack').onclick=mfIntro;
+  document.querySelectorAll('.mf-cell').forEach(b=>b.onclick=()=>{W.i=+b.dataset.i;mfStep()});
+  let buf=null;
+  const build=async()=>{$('#mfSave').disabled=true;$('#mfPrevT').textContent='Armando tu tipografía…';$('#mfPrevT').style.fontFamily='';
+    try{buf=await mfBuild(W.thick);await mfInstall(buf);const pv=$('#mfPrev');if(!pv)return;pv.setAttribute('style',handStyle('mine',S.prefs.ink));
+      $('#mfPrevT').textContent='Hola, ¿cómo estás? Te extraño mucho.\nNos vemos a la noche: te quiero, Amor.\n0123456789';$('#mfSave').disabled=false}
+    catch(e){$('#mfErr').textContent=e.message||'No se pudo armar la tipografía.'}};
+  document.querySelectorAll('#mfThick [data-t]').forEach(b=>b.onclick=()=>{W.thick=+b.dataset.t;document.querySelectorAll('#mfThick [data-t]').forEach(x=>x.classList.toggle('on',x===b));build()});
+  $('#mfSave').onclick=()=>{let kept=true;try{localStorage.setItem('tp-font',b64(buf))}catch(e){kept=false}
+    if(!kept)setTimeout(()=>toast('Tu letra se usa ahora, pero no se pudo guardar para la próxima vez'),2200);
+    S.prefs.hand='mine';S.prefs.mfThick=W.thick;save();mfClose();toast('Listo: tus cartas ahora usan tu letra');vib([20,40,20]);if(S.tab==='cartas')V.cartas()};
+  if(have)build();else{$('#mfPrevT').textContent='Todavía no escaneaste ninguna letra.'}
+}
+
 /* ajustes */
 $('#openSettings').onclick=()=>{
   const sw=k=>{const s=SKINS[k];return `<button class="sw ${S.skin===k?'on':''}" data-s="${k}" aria-pressed="${S.skin===k}"><span class="orb" style="background:${s?s.bg:'linear-gradient(135deg,#f3f1f8 50%,#0b0d1a 50%)'}"><i style="background:${s?s.a:'#8a6fd6'}"></i><i style="background:${s?s.b:'#8fd3ff'}"></i></span>${s?s.n:'Auto'}</button>`};
@@ -1664,7 +1954,7 @@ $('#openSettings').onclick=()=>{
      <button class="btn soft full" id="ptest">Probar notificación</button></div>
    <div class="field"><span class="flabel">Cartas</span><div class="group">
      <div><span>Tu letra</span><span class="hand-prev" style="${handStyle(S.prefs.hand,S.prefs.ink)}">${S.prefs.hand?esc(HANDS[S.prefs.hand].n):'Sin elegir'}</span></div></div>
-     <button class="btn soft full" id="phand">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button></div>
+     <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div></div>
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
      <div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div>
      <div><span>Teléfono de ${esc(S.partner)}</span><span class="sub">Sin sincronizar todavía</span></div></div>
@@ -1676,6 +1966,7 @@ $('#openSettings').onclick=()=>{
     $('#ps').onchange=e=>{S.prefs.sound=e.target.checked;save();if(S.prefs.sound)AU.chime()};
     $('#ptest').onclick=()=>{closeSheet();setTimeout(()=>push(S.partner,'Te extraño'),300)};
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
+    $('#pmine').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
@@ -1696,6 +1987,7 @@ new MutationObserver(readColors).observe(document.documentElement,{attributes:tr
 
 /* arranque */
 applySkin();
+mfLoadSaved();
 if(S.paired){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
