@@ -14,7 +14,7 @@
 <title>Twin Particles</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&family=Manrope:wght@400;500;600;700&family=Caveat:wght@500&family=Kalam:wght@400&family=Homemade+Apple&family=Shadows+Into+Light&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600&family=Manrope:wght@400;500;600;700&family=Caveat:wght@500&family=Kalam:wght@400&family=Homemade+Apple&family=Shadows+Into+Light&family=Indie+Flower&family=Dancing+Script:wght@500&family=Reenie+Beanie&family=Patrick+Hand&display=swap">
 <style>
 /* Layout: una columna de teléfono; dos partículas como corazón visual; inicio de vinculación a pantalla completa; barra de pestañas inferior. */
 :root{
@@ -543,7 +543,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <script>
 (function(){
-const VERSION='beta 0.9';
+const VERSION='beta 0.10';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -679,7 +679,7 @@ try{S=JSON.parse(localStorage.getItem('tp-state'))}catch(e){}
 if(!S||!S.lists)S=JSON.parse(JSON.stringify(DEF));
 if(!S.prefs)S.prefs={vib:true,sound:true,tone:'entrelazado'};
 if(!S.lists.tareas)S.lists.tareas=[];
-if(S.v!==VERSION){const old=parseFloat(String(S.v).replace('beta ',''))||0;if(old<0.9){['feed','albums','events','letters'].forEach(k=>S[k]=[]);S.lists=JSON.parse(JSON.stringify(DEF.lists));S.ignored=0;S.lastHeavy=0;S.draft=null}S.v=VERSION;if(S.paired===undefined)S.paired=false;if(S.me==='Vos')S.me=''}
+if(S.v!==VERSION){const old=String(S.v||'');if(!old||/^beta 0\.[0-8]$/.test(old)){['feed','albums','events','letters'].forEach(k=>S[k]=[]);S.lists=JSON.parse(JSON.stringify(DEF.lists));S.ignored=0;S.lastHeavy=0;S.draft=null}S.v=VERSION;if(S.paired===undefined)S.paired=false;if(S.me==='Vos')S.me=''}
 const meName=()=>'Vos';
 if(!S.partner)S.partner='Mi pareja';
 const blobs={};
@@ -1557,7 +1557,11 @@ const HANDS={
   caveat:{n:'Rápida',f:"'Caveat', 'Bradley Hand', cursive",s:27},
   kalam:{n:'Prolija',f:"'Kalam', 'Bradley Hand', cursive",s:21},
   apple:{n:'Cursiva',f:"'Homemade Apple', 'Snell Roundhand', cursive",s:17},
-  shadows:{n:'Despreocupada',f:"'Shadows Into Light', 'Bradley Hand', cursive",s:24}
+  shadows:{n:'Despreocupada',f:"'Shadows Into Light', 'Bradley Hand', cursive",s:24},
+  indie:{n:'Redondeada',f:"'Indie Flower', 'Bradley Hand', cursive",s:22},
+  dancing:{n:'Elegante',f:"'Dancing Script', 'Snell Roundhand', cursive",s:25},
+  reenie:{n:'Apurada',f:"'Reenie Beanie', 'Bradley Hand', cursive",s:29},
+  patrick:{n:'Clara',f:"'Patrick Hand', 'Bradley Hand', cursive",s:23}
 };
 const INKS={azul:{n:'Azul',c:'#23408e'},negro:{n:'Negro',c:'#1f1d26'},violeta:{n:'Violeta',c:'#5b2a86'}};
 const handStyle=(h,i)=>{const H=HANDS[h]||HANDS.caveat;return `--hand:${H.f};--hs:${H.s}px;--ink:${(INKS[i]||INKS.azul).c}`};
