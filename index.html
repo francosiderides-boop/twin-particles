@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.15';
+const VERSION='beta 0.16';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1567,16 +1567,35 @@ async function tvmazeSearch(q){
     desc:clip(stripHtml(s.summary),320),img:(s.image&&(s.image.original||s.image.medium))||'',url:s.officialSite||s.url,src:'tvmaze',host:'tvmaze.com'}));
 }
 const PIPED=['https://api.piped.private.coffee','https://pipedapi.kavin.rocks','https://pipedapi.adminforge.de','https://pipedapi.r4fo.com'];
-const INVID=['https://inv.nadeko.net','https://invidious.nerdvpn.de','https://yewtu.be'];
+const INVID=['https://inv.nadeko.net','https://invidious.nerdvpn.de','https://yewtu.be','https://invidious.f5.si'];
 const ytId=u=>{const m=String(u).match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);return m&&m[1]};
+let INV_CACHE=null,INV_CACHE_T=0;
+async function invidiousBases(){
+  const now=Date.now();
+  if(INV_CACHE&&now-INV_CACHE_T<30*60*1000)return INV_CACHE;
+  try{
+    const j=await jget1('https://api.invidious.io/instances.json?sort_by=type,users',5000);
+    const list=(j||[]).filter(e=>Array.isArray(e)&&e[1]&&e[1].type==='https'&&e[1].api!==false).map(e=>e[1].uri);
+    if(list.length){INV_CACHE=[...new Set([...list,...INVID])];INV_CACHE_T=now}
+  }catch(e){}
+  return INV_CACHE||INVID;
+}
+async function invidiousOne(base,q){
+  const j=await jget1(base+'/api/v1/search?type=video&q='+encodeURIComponent(q),5000);
+  if(!Array.isArray(j))throw new Error('bad');
+  return j;
+}
 async function youtubeSearch(q){
   const id=ytId(q);
   if(id){const j=await jget('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id));
     return[{t:j.title,meta:j.author_name,desc:'',img:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+id,src:'yt',host:'youtube.com'}]}
-  for(const base of PIPED){try{const j=await jget(base+'/search?filter=videos&q='+encodeURIComponent(q),5000);const items=(j.items||[]).filter(x=>x.type==='stream'&&ytId(x.url));if(!items.length)continue;
+  const bases=(await invidiousBases()).slice(0,12);
+  try{
+    const j=await Promise.any(bases.map(b=>invidiousOne(b,q)));
+    return j.slice(0,8).map(x=>({t:x.title,meta:[x.author,fmtDur(x.lengthSeconds)].filter(Boolean).join(' · '),desc:clip(x.description||'',240),img:`https://i.ytimg.com/vi/${x.videoId}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+x.videoId,src:'yt',host:'youtube.com'}));
+  }catch(e){}
+  for(const base of PIPED){try{const j=await jget1(base+'/search?filter=videos&q='+encodeURIComponent(q),5000);const items=(j.items||[]).filter(x=>x.type==='stream'&&ytId(x.url));if(!items.length)continue;
     return items.slice(0,8).map(x=>{const v=ytId(x.url);return{t:x.title,meta:[x.uploaderName,fmtDur(x.duration)].filter(Boolean).join(' · '),desc:clip(x.shortDescription||'',240),img:`https://i.ytimg.com/vi/${v}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+v,src:'yt',host:'youtube.com'}})}catch(e){}}
-  for(const base of INVID){try{const j=await jget(base+'/api/v1/search?type=video&q='+encodeURIComponent(q),5000);if(!Array.isArray(j)||!j.length)continue;
-    return j.slice(0,8).map(x=>({t:x.title,meta:[x.author,fmtDur(x.lengthSeconds)].filter(Boolean).join(' · '),desc:clip(x.description||'',240),img:`https://i.ytimg.com/vi/${x.videoId}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+x.videoId,src:'yt',host:'youtube.com'}))}catch(e){}}
   throw new Error('youtube');
 }
 async function podcastSearch(q){
