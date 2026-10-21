@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.21';
+const VERSION='beta 0.22';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -795,7 +795,8 @@ function netConnectToPartner(){
    alcanza para autenticar los avisos ante el navegador, no protege nada valioso.
    ========================================================= */
 const VAPID_PUB='BMzKUgL6etueLcdZg9z7grPb8F01ZjYBNPYk2uL978mFxENeNOALZsX8wjlrUPPtejHd1BuU0arYbZK9i_yGWdM';
-const VAPID_JWK={kty:'EC',crv:'P-256',d:'xIGr5U3kBl_TE35ZEC9KVxEnF7gpCMklK5vOSGDpII4',x:'zMpSAvp6254tx1mD3PuCs9vwXTVmNgE09iTa4v3vyYU',y:'xENeNOALZsX8wjlrUPPtejHd1BuU0arYbZK9i_yGWdM'};
+const RELAY_URL='https://twin-particales-push.francosiderides.workers.dev';
+const RELAY_KEY='tp9-f3kd9s82jd';
 const b64uToBuf=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
 const bufToB64u=b=>{let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
 async function ensurePush(){
@@ -810,46 +811,12 @@ async function ensurePush(){
     return j;
   }catch(e){return null}
 }
-async function vapidJWT(aud){
-  const key=await crypto.subtle.importKey('jwk',VAPID_JWK,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
-  const h=bufToB64u(new TextEncoder().encode(JSON.stringify({typ:'JWT',alg:'ES256'})));
-  const p=bufToB64u(new TextEncoder().encode(JSON.stringify({aud,exp:Math.floor(Date.now()/1000)+12*3600,sub:'mailto:chulo.fgonzalez@gmail.com'})));
-  const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,new TextEncoder().encode(h+'.'+p));
-  return h+'.'+p+'.'+bufToB64u(sig);
-}
-async function encryptPush(sub,payloadObj){
-  const plaintext=new TextEncoder().encode(JSON.stringify(payloadObj));
-  const uaPub=b64uToBuf(sub.keys.p256dh),authSecret=b64uToBuf(sub.keys.auth);
-  const uaKey=await crypto.subtle.importKey('raw',uaPub,{name:'ECDH',namedCurve:'P-256'},false,[]);
-  const eph=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
-  const ephPubRaw=new Uint8Array(await crypto.subtle.exportKey('raw',eph.publicKey));
-  const ecdhSecret=new Uint8Array(await crypto.subtle.deriveBits({name:'ECDH',public:uaKey},eph.privateKey,256));
-  const ikmKey=await crypto.subtle.importKey('raw',ecdhSecret,'HKDF',false,['deriveBits']);
-  const keyInfo=new Uint8Array([...new TextEncoder().encode('WebPush: info\0'),...uaPub,...ephPubRaw]);
-  const ikm=await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:authSecret,info:keyInfo},ikmKey,256);
-  const salt=crypto.getRandomValues(new Uint8Array(16));
-  const prkKey=await crypto.subtle.importKey('raw',ikm,'HKDF',false,['deriveBits']);
-  const cekInfo=new TextEncoder().encode('Content-Encoding: aes128gcm\0');
-  const nonceInfo=new TextEncoder().encode('Content-Encoding: nonce\0');
-  const cek=await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info:cekInfo},prkKey,128);
-  const nonce=new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info:nonceInfo},prkKey,96));
-  const aesKey=await crypto.subtle.importKey('raw',cek,'AES-GCM',false,['encrypt']);
-  const padded=new Uint8Array(plaintext.length+1);padded.set(plaintext);padded[plaintext.length]=2;
-  const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce},aesKey,padded));
-  const header=new Uint8Array(16+4+1+65);
-  header.set(salt,0);
-  new DataView(header.buffer).setUint32(16,4096);
-  header[20]=65;header.set(ephPubRaw,21);
-  const body=new Uint8Array(header.length+cipher.length);body.set(header);body.set(cipher,header.length);
-  return body;
-}
 async function sendPush(sub,payloadObj){
+  // el navegador ya no puede mandarle el push directo al servicio (FCM/Mozilla/Apple
+  // bloquean eso por CORS desde 2022), así que un relay chiquito hace esa parte.
   try{
     if(!sub||!sub.endpoint)return false;
-    const aud=new URL(sub.endpoint).origin;
-    const jwt=await vapidJWT(aud);
-    const body=await encryptPush(sub,payloadObj);
-    const r=await fetch(sub.endpoint,{method:'POST',headers:{'TTL':'86400','Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream','Authorization':'vapid t='+jwt+', k='+VAPID_PUB},body});
+    const r=await fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({subscription:sub,payload:payloadObj})});
     return r.ok;
   }catch(e){return false}
 }
