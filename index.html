@@ -569,7 +569,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.11';
+const VERSION='beta 0.12';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1897,19 +1897,34 @@ function mfStep(){
     $('#mfNext').onclick=()=>{if(!MF.glyphs[ch]){$('#mfStatus').textContent='Sacale una foto o tocá Saltear.';return}go2()};
   }else{
     const dpr=Math.min(2,devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);mfDrawGuides(x,w,h);
-    const ink=document.createElement('canvas');ink.width=w;ink.height=h;const ix=ink.getContext('2d');
-    [x,ix].forEach(c=>{c.lineCap='round';c.lineJoin='round';c.lineWidth=Math.max(5,h*.03);c.strokeStyle=(INKS[S.prefs.ink]||INKS.azul).c});ix.strokeStyle='#000';
-    let drawing=false,last=null,any=false;
+    // el trazo se guarda al doble de resolución para que la letra quede más prolija
+    const R=2,ink=document.createElement('canvas');ink.width=w*R;ink.height=h*R;const ix=ink.getContext('2d');ix.scale(R,R);
+    const LW=Math.max(5,h*.03);
+    [x,ix].forEach(c=>{c.lineCap='round';c.lineJoin='round';c.lineWidth=LW;c.strokeStyle=(INKS[S.prefs.ink]||INKS.azul).c});ix.strokeStyle='#000';
+    let drawing=false,any=false,sm=null,prev=null,prevMid=null,cur=null;const strokes=[];
     $('#mfStatus').textContent=rec?'Ya guardaste esta letra. Si dibujás, se reemplaza.':'Dibujala apoyada en la línea de abajo';
-    cv.onpointerdown=e=>{drawing=true;any=true;$('#mfStatus').textContent='';const r=cv.getBoundingClientRect();last=[e.clientX-r.left,e.clientY-r.top];try{cv.setPointerCapture(e.pointerId)}catch(_){};[x,ix].forEach(c=>{c.beginPath();c.arc(last[0],last[1],c.lineWidth/2,0,7);c.fillStyle=c.strokeStyle;c.fill()})};
-    cv.onpointermove=e=>{if(!drawing)return;const r=cv.getBoundingClientRect(),p=[e.clientX-r.left,e.clientY-r.top];[x,ix].forEach(c=>{c.beginPath();c.moveTo(last[0],last[1]);c.lineTo(p[0],p[1]);c.stroke()});last=p};
-    cv.onpointerup=cv.onpointercancel=()=>{drawing=false};
+    const pos=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
+    const dot=(c,p)=>{c.beginPath();c.arc(p[0],p[1],LW/2,0,7);c.fillStyle=c.strokeStyle;c.fill()};
+    // mientras dibujás: el punto sigue al dedo con un poco de inercia (lazy brush) y se une con curvas
+    const feed=p=>{cur.push(p);const d=Math.hypot(p[0]-sm[0],p[1]-sm[1]),R0=2.2;if(d<=R0)return;const k=(d-R0)/d*.6;sm=[sm[0]+(p[0]-sm[0])*k,sm[1]+(p[1]-sm[1])*k];
+      const mid=[(prev[0]+sm[0])/2,(prev[1]+sm[1])/2];x.beginPath();x.moveTo(prevMid[0],prevMid[1]);x.quadraticCurveTo(prev[0],prev[1],mid[0],mid[1]);x.stroke();prev=sm;prevMid=mid};
+    // al soltar: se redibuja todo con un suavizado más fuerte
+    const smooth=pts=>{if(pts.length<3)return pts;let p=pts.filter((q,i)=>!i||Math.hypot(q[0]-pts[i-1][0],q[1]-pts[i-1][1])>.8);
+      for(let pass=0;pass<7;pass++)p=p.map((q,i)=>{if(!i||i===p.length-1)return q;const a=p[i-1],b=p[i+1];return[(a[0]+2*q[0]+b[0])/4,(a[1]+2*q[1]+b[1])/4]});
+      const out=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];out.push([.75*a[0]+.25*b[0],.75*a[1]+.25*b[1]],[.25*a[0]+.75*b[0],.25*a[1]+.75*b[1]])}out.push(p[p.length-1]);return out};
+    const paint=c=>{strokes.forEach(st=>{const p=smooth(st);if(p.length<2)return dot(c,p[0]);c.beginPath();c.moveTo(p[0][0],p[0][1]);
+      for(let i=1;i<p.length-1;i++){const m=[(p[i][0]+p[i+1][0])/2,(p[i][1]+p[i+1][1])/2];c.quadraticCurveTo(p[i][0],p[i][1],m[0],m[1])}c.lineTo(p[p.length-1][0],p[p.length-1][1]);c.stroke()})};
+    const redraw=()=>{x.clearRect(0,0,w,h);mfDrawGuides(x,w,h);paint(x);ix.clearRect(0,0,w,h);paint(ix)};
+    cv.onpointerdown=e=>{e.preventDefault();drawing=true;any=true;$('#mfStatus').textContent='';const p=pos(e);sm=p;prev=p;prevMid=p;cur=[p];strokes.push(cur);try{cv.setPointerCapture(e.pointerId)}catch(_){};dot(x,p)};
+    cv.onpointermove=e=>{if(!drawing)return;const evs=e.getCoalescedEvents?e.getCoalescedEvents():[];(evs.length?evs:[e]).forEach(ev=>feed(pos(ev)))};
+    const end=e=>{if(!drawing)return;drawing=false;if(e&&e.clientX!=null)cur.push(pos(e));redraw()};
+    cv.onpointerup=end;cv.onpointercancel=end;
     $('#mfTools').innerHTML=`<button class="btn soft full" id="mfClear">Borrar y volver a dibujar</button>`;
-    $('#mfClear').onclick=()=>{any=false;mfStep()};
+    $('#mfClear').onclick=()=>{any=false;strokes.length=0;redraw()};
     $('#mfNext').onclick=()=>{
-      if(any){const d=ix.getImageData(0,0,w,h).data,b=new Uint8Array(w*h);for(let i=0;i<w*h;i++)b[i]=d[i*4+3]>100?1:0;const cs2=mfComponents(b,w,h);const r=mfCrop(b,w,h,cs2);
-        if(r){const u=700/((GUIDE.base-GUIDE.cap)*h);let y0=h,y1=0;cs2.forEach(c=>{y0=Math.min(y0,c.y0);y1=Math.max(y1,c.y1)});
-          MF.glyphs[ch]={png:mfToPng(r),w:r.w,h:r.h,top:Math.round((GUIDE.base*h-y0)*u),bottom:Math.round((GUIDE.base*h-y1-1)*u)};saveGlyphs()}}
+      if(any){const IW=w*R,IH=h*R,d=ix.getImageData(0,0,IW,IH).data,b=new Uint8Array(IW*IH);for(let i=0;i<IW*IH;i++)b[i]=d[i*4+3]>100?1:0;const cs2=mfComponents(b,IW,IH);const r=mfCrop(b,IW,IH,cs2);
+        if(r){const u=700/((GUIDE.base-GUIDE.cap)*IH);let y0=IH,y1=0;cs2.forEach(c=>{y0=Math.min(y0,c.y0);y1=Math.max(y1,c.y1)});
+          MF.glyphs[ch]={png:mfToPng(r),w:r.w,h:r.h,top:Math.round((GUIDE.base*IH-y0)*u),bottom:Math.round((GUIDE.base*IH-y1-1)*u)};saveGlyphs()}}
       if(!MF.glyphs[ch]){$('#mfStatus').textContent='Dibujá la letra o tocá Saltear.';return}
       go2()};
   }
