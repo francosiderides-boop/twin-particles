@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.28';
+const VERSION='beta 0.29';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -788,6 +788,9 @@ function netWire(conn){
     else if(d.type==='alarmResp'&&NET.onAlarmResp)NET.onAlarmResp(d);
     else if(d.type==='letter'&&NET.onLetter)NET.onLetter(d);
     else if(d.type==='letterRead'){const l=S.letters.find(x=>x.id===d.id);if(l&&!l.opened){l.opened=1;save();if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}}
+    else if(d.type==='albumadd'&&NET.onAlbumAdd)NET.onAlbumAdd(d);
+    else if(d.type==='photoadd'&&NET.onPhotoAdd)NET.onPhotoAdd(d);
+    else if(d.type==='albumdel'&&NET.onAlbumDel)NET.onAlbumDel(d);
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
@@ -891,7 +894,7 @@ async function sendPush(sub,payloadObj){
   }catch(e){return false}
 }
 function pushPartner(title,body,tag){
-  if(S.partnerPushSub)sendPush(S.partnerPushSub,{title,body,tag:tag||'tp',url:'./'}).catch(()=>{});
+  if(S.partnerPushSub)sendPush(S.partnerPushSub,{title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./'}).catch(()=>{});
 }
 
 function applySkin(){
@@ -1423,7 +1426,7 @@ V.albumes=function(){
   document.querySelectorAll('.album[data-id]').forEach(b=>b.onclick=()=>{openAlbum=b.dataset.id;V.albumes()});
   $('#newAlb').onclick=()=>sheet(`<h2>Nuevo álbum</h2><div class="field"><label for="an">Nombre</label><input class="input" id="an" maxlength="40" placeholder="Ej: Vacaciones en Bariloche"></div><button class="btn full" id="anOk">Crear álbum</button>`,()=>{
     $('#an').focus();$('#an').onkeydown=e=>{if(e.key==='Enter')$('#anOk').click()};
-    $('#anOk').onclick=()=>{const v=$('#an').value.trim();if(!v)return;const a={id:uid(),name:v,date:TODAYS,photos:[]};S.albums.unshift(a);save();closeSheet();openAlbum=a.id;V.albumes();toast('Álbum creado')}});
+    $('#anOk').onclick=()=>{const v=$('#an').value.trim();if(!v)return;const a={id:uid(),name:v,date:TODAYS,photos:[]};S.albums.unshift(a);save();netSendSure({type:'albumadd',album:{id:a.id,name:a.name,date:a.date}});closeSheet();openAlbum=a.id;V.albumes();toast('Álbum creado')}});
 };
 function albumView(a){
   render(`<button class="back" id="bk">${ICON.left} Álbumes</button>
@@ -1435,8 +1438,8 @@ function albumView(a){
   if(a.photos.length)$('#phs').innerHTML=a.photos.map((p,i)=>`<button class="ph" data-i="${i}" style="background-image:url('${photoSrc(p)}')" aria-label="Ver foto ${i+1}"></button>`).join('');
   document.querySelectorAll('.ph').forEach(b=>b.onclick=()=>{$('#layer').innerHTML=`<div class="lightbox" id="lb"><img src="${photoSrc(a.photos[b.dataset.i])}" alt="Foto ${+b.dataset.i+1} del álbum ${esc(a.name)}"></div>`;$('#lb').onclick=()=>$('#layer').innerHTML=''});
   $('#bk').onclick=()=>{openAlbum=null;V.albumes()};
-  $('#delA').onclick=()=>sheet(`<h2>¿Borrar “${esc(a.name)}”?</h2><p class="sub">Se borra para los dos, con todas sus fotos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.albums=S.albums.filter(x=>x!==a);save();openAlbum=null;closeSheet();V.albumes();toast('Álbum borrado')}});
-  $('#up').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;let n=0;fs.forEach(f=>{const r=new FileReader();r.onload=()=>{const k=uid();setBlob(k,r.result);a.photos.unshift({k});if(++n===fs.length){save();albumView(a);entangle();toast(fs.length+(fs.length>1?' fotos agregadas':' foto agregada'))}};r.readAsDataURL(f)})};
+  $('#delA').onclick=()=>sheet(`<h2>¿Borrar “${esc(a.name)}”?</h2><p class="sub">Se borra para los dos, con todas sus fotos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.albums=S.albums.filter(x=>x!==a);save();netSendSure({type:'albumdel',id:a.id});openAlbum=null;closeSheet();V.albumes();toast('Álbum borrado')}});
+  $('#up').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;let n=0;fs.forEach(f=>{const r=new FileReader();r.onload=()=>{const k=uid();setBlob(k,r.result);a.photos.unshift({k});netSendSure({type:'photoadd',albumId:a.id,albumName:a.name,albumDate:a.date,photo:{k,blob:r.result}});if(++n===fs.length){save();albumView(a);entangle();toast(fs.length+(fs.length>1?' fotos agregadas':' foto agregada'))}};r.readAsDataURL(f)})};
 }
 
 /* listas */
@@ -1736,7 +1739,7 @@ async function invidiousBases(){
   return INV_CACHE||INVID;
 }
 async function invidiousOne(base,q){
-  const j=await jget1(base+'/api/v1/search?type=video&q='+encodeURIComponent(q),5000);
+  const j=await jget1(base+'/api/v1/search?type=video&region=AR&q='+encodeURIComponent(q),5000);
   if(!Array.isArray(j))throw new Error('bad');
   return j;
 }
@@ -1767,6 +1770,8 @@ async function searchRemote(listId,q){
     const cl=c.status==='fulfilled'?c.value:[],wl=w.status==='fulfilled'?w.value:[];
     if(c.status==='rejected'&&w.status==='rejected')throw new Error('sin conexión');
     const seen=new Set(cl.map(x=>norm(x.t)));
+    const wlByT={};wl.forEach(x=>{wlByT[norm(x.t)]=x});
+    cl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc}); // preferir la descripción en español si existe
     r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).slice(0,8);
     if(lb)r=r.map((x,i)=>i?x:{...x,lb:q.trim()})}
   else if(listId==='series'){const [c,w,t]=await Promise.allSettled([cinemetaSearch('series',q),wikiSearch(q,'tv'),tvmazeSearch(q)]);
@@ -1774,6 +1779,9 @@ async function searchRemote(listId,q){
     if(c.status==='rejected'&&w.status==='rejected'&&t.status==='rejected')throw new Error('sin conexión');
     const seen=new Set(cl.map(x=>norm(x.t)));
     wl.forEach(x=>{if(!x.img){const m=tl.find(y=>norm(y.t)===norm(x.t));if(m)x.img=m.img}});
+    const wlByT={};wl.forEach(x=>{wlByT[norm(x.t)]=x});
+    cl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc}); // preferir la descripción en español si existe
+    tl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc});
     r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).concat(tl.filter(x=>!seen.has(norm(x.t))&&!wl.some(y=>norm(y.t)===norm(x.t)))).slice(0,8)}
   else if(listId==='yt')r=await youtubeSearch(q);
   else if(listId==='pod')r=await podcastSearch(q);
@@ -2400,12 +2408,36 @@ NET.onEventAdd=d=>{
   S.events.push(ev);save();entangle();push(S.partner,'agregó un evento: '+ev.t);
   if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();
 };
+NET.onAlbumAdd=d=>{
+  const al=d.album;if(!al||!al.id)return;
+  if(S.albums.some(x=>x.id===al.id))return;
+  S.albums.unshift({id:al.id,name:al.name,date:al.date,photos:[]});save();
+  if(S.tab==='albumes'&&!$('#main').hidden)V.albumes();
+};
+NET.onPhotoAdd=d=>{
+  let a=S.albums.find(x=>x.id===d.albumId);
+  if(!a){a={id:d.albumId,name:d.albumName||'Álbum',date:d.albumDate||TODAYS,photos:[]};S.albums.unshift(a)}
+  if(!d.photo||!d.photo.k||a.photos.some(p=>p.k===d.photo.k))return;
+  setBlob(d.photo.k,d.photo.blob);a.photos.unshift({k:d.photo.k});save();entangle();
+  push(S.partner,'agregó una foto a '+a.name);
+  if(openAlbum===a.id)albumView(a);else if(S.tab==='albumes'&&!$('#main').hidden)V.albumes();
+};
+NET.onAlbumDel=d=>{
+  if(!d.id)return;
+  S.albums=S.albums.filter(x=>x.id!==d.id);save();
+  if(openAlbum===d.id)openAlbum=null;
+  if(S.tab==='albumes'&&!$('#main').hidden)V.albumes();
+};
 if(S.paired||S.solo){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
   if(S.paired)ensurePush();
   loadBlobsFromIDB().then(()=>{if(V[S.tab]&&!$('#main').hidden)V[S.tab]()});
+  // si abrió la app tocando la notificación de una alarma, que suene YA en vez
+  // de esperar a que la conexión en vivo confirme el aviso (eso igual llega
+  // después y no pasa nada si ya está sonando)
+  if(location.hash==='#ring'){history.replaceState(null,'',location.pathname);ringIncoming(S.partner,false,false)}
 }else showOnboard();
 })();
 </script>
