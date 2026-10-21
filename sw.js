@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.19';
+const CACHE='tp-beta-0.20';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -13,4 +13,26 @@ self.addEventListener('fetch',e=>{
   e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{
     if(res.ok&&(new URL(e.request.url).origin===location.origin||e.request.url.includes('fonts.g'))){const cp=res.clone();caches.open(CACHE).then(c=>c.put(e.request,cp))}
     return res})));
+});
+/* notificaciones en segundo plano (Web Push) */
+self.addEventListener('push',e=>{
+  let d={};try{d=e.data?e.data.json():{}}catch(err){}
+  const title=d.title||'Twin Particles';
+  e.waitUntil(self.registration.showNotification(title,{
+    body:d.body||'',
+    icon:'icon-192.png',
+    badge:'icon-192.png',
+    tag:d.tag||'tp',
+    renotify:true,
+    vibrate:[60,40,60],
+    data:{url:d.url||'./'}
+  }));
+});
+self.addEventListener('notificationclick',e=>{
+  e.notification.close();
+  const url=(e.notification.data&&e.notification.data.url)||'./';
+  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
+    for(const c of list)if('focus' in c)return c.focus();
+    if(self.clients.openWindow)return self.clients.openWindow(url);
+  }));
 });

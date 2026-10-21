@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.19';
+const VERSION='beta 0.20';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -726,7 +726,7 @@ function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}
 function netWire(conn){
   NET.conn=conn;NET.remotePeerId=conn.peer;
   if(conn.open){NET.ready=true;netOnStatus(true)}
-  conn.on('open',()=>{NET.ready=true;netOnStatus(true);NET.onPairConnect&&NET.onPairConnect()});
+  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});NET.onPairConnect&&NET.onPairConnect()});
   conn.on('data',d=>{
     if(!d||!d.type)return;
     if(d.type==='hello'&&NET.onHello)NET.onHello(d);
@@ -736,6 +736,9 @@ function netWire(conn){
     else if(d.type==='alarm'&&NET.onAlarm)NET.onAlarm(d);
     else if(d.type==='alarmResp'&&NET.onAlarmResp)NET.onAlarmResp(d);
     else if(d.type==='letter'&&NET.onLetter)NET.onLetter(d);
+    else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
+    else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
+    else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
     else if(d.type==='state'&&NET.onState)NET.onState(d);
   });
   conn.on('close',()=>{NET.ready=false;netOnStatus(false);netScheduleReconnect()});
@@ -784,6 +787,74 @@ function netConnectToPartner(){
     p.on('connection',conn=>netWire(conn));
     p.on('error',()=>netScheduleReconnect());
   });
+}
+
+/* =========================================================
+   NOTIFICACIONES EN SEGUNDO PLANO (Web Push, sin servidor propio)
+   Las claves VAPID viajan en el código porque no hay backend: con esto
+   alcanza para autenticar los avisos ante el navegador, no protege nada valioso.
+   ========================================================= */
+const VAPID_PUB='BMzKUgL6etueLcdZg9z7grPb8F01ZjYBNPYk2uL978mFxENeNOALZsX8wjlrUPPtejHd1BuU0arYbZK9i_yGWdM';
+const VAPID_JWK={kty:'EC',crv:'P-256',d:'xIGr5U3kBl_TE35ZEC9KVxEnF7gpCMklK5vOSGDpII4',x:'zMpSAvp6254tx1mD3PuCs9vwXTVmNgE09iTa4v3vyYU',y:'xENeNOALZsX8wjlrUPPtejHd1BuU0arYbZK9i_yGWdM'};
+const b64uToBuf=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const bin=atob(s);const a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a};
+const bufToB64u=b=>{let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
+async function ensurePush(){
+  try{
+    if(!('serviceWorker' in navigator)||!('PushManager' in window))return null;
+    const perm=await Notification.requestPermission();if(perm!=='granted')return null;
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBuf(VAPID_PUB)});
+    const j=sub.toJSON();S.myPushSub=j;save();
+    if(NET.ready)netSend({type:'pushsub',sub:j});
+    return j;
+  }catch(e){return null}
+}
+async function vapidJWT(aud){
+  const key=await crypto.subtle.importKey('jwk',VAPID_JWK,{name:'ECDSA',namedCurve:'P-256'},false,['sign']);
+  const h=bufToB64u(new TextEncoder().encode(JSON.stringify({typ:'JWT',alg:'ES256'})));
+  const p=bufToB64u(new TextEncoder().encode(JSON.stringify({aud,exp:Math.floor(Date.now()/1000)+12*3600,sub:'mailto:chulo.fgonzalez@gmail.com'})));
+  const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},key,new TextEncoder().encode(h+'.'+p));
+  return h+'.'+p+'.'+bufToB64u(sig);
+}
+async function encryptPush(sub,payloadObj){
+  const plaintext=new TextEncoder().encode(JSON.stringify(payloadObj));
+  const uaPub=b64uToBuf(sub.keys.p256dh),authSecret=b64uToBuf(sub.keys.auth);
+  const uaKey=await crypto.subtle.importKey('raw',uaPub,{name:'ECDH',namedCurve:'P-256'},false,[]);
+  const eph=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+  const ephPubRaw=new Uint8Array(await crypto.subtle.exportKey('raw',eph.publicKey));
+  const ecdhSecret=new Uint8Array(await crypto.subtle.deriveBits({name:'ECDH',public:uaKey},eph.privateKey,256));
+  const ikmKey=await crypto.subtle.importKey('raw',ecdhSecret,'HKDF',false,['deriveBits']);
+  const keyInfo=new Uint8Array([...new TextEncoder().encode('WebPush: info\0'),...uaPub,...ephPubRaw]);
+  const ikm=await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:authSecret,info:keyInfo},ikmKey,256);
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const prkKey=await crypto.subtle.importKey('raw',ikm,'HKDF',false,['deriveBits']);
+  const cekInfo=new TextEncoder().encode('Content-Encoding: aes128gcm\0');
+  const nonceInfo=new TextEncoder().encode('Content-Encoding: nonce\0');
+  const cek=await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info:cekInfo},prkKey,128);
+  const nonce=new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt,info:nonceInfo},prkKey,96));
+  const aesKey=await crypto.subtle.importKey('raw',cek,'AES-GCM',false,['encrypt']);
+  const padded=new Uint8Array(plaintext.length+1);padded.set(plaintext);padded[plaintext.length]=2;
+  const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:nonce},aesKey,padded));
+  const header=new Uint8Array(16+4+1+65);
+  header.set(salt,0);
+  new DataView(header.buffer).setUint32(16,4096);
+  header[20]=65;header.set(ephPubRaw,21);
+  const body=new Uint8Array(header.length+cipher.length);body.set(header);body.set(cipher,header.length);
+  return body;
+}
+async function sendPush(sub,payloadObj){
+  try{
+    if(!sub||!sub.endpoint)return false;
+    const aud=new URL(sub.endpoint).origin;
+    const jwt=await vapidJWT(aud);
+    const body=await encryptPush(sub,payloadObj);
+    const r=await fetch(sub.endpoint,{method:'POST',headers:{'TTL':'86400','Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream','Authorization':'vapid t='+jwt+', k='+VAPID_PUB},body});
+    return r.ok;
+  }catch(e){return false}
+}
+function pushPartner(title,body,tag){
+  if(S.partnerPushSub)sendPush(S.partnerPushSub,{title,body,tag:tag||'tp',url:'./'}).catch(()=>{});
 }
 
 function applySkin(){
@@ -1013,6 +1084,7 @@ function bond(){
       <button class="btn lg full" id="obEnter" style="margin-top:8px">Entrar</button></div>`;
     $('#obTop').style.opacity='1';
     $('#obEnter').onclick=enterApp;
+    ensurePush();
   });
 }
 function enterApp(){
@@ -1028,7 +1100,7 @@ function enterApp(){
 function send(text,btn){
   text=text.trim();if(!text)return;
   S.feed.unshift({from:'m',text,t:Date.now()});S.feed=S.feed.slice(0,60);save();
-  netSend({type:'signal',text});
+  netSend({type:'signal',text});if(!S.solo)pushPartner('Te mandó una señal',text,'signal');
   entangle();toast(S.solo?'Guardado en tu historial':(NET.ready?'Enviado a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora'));renderFeed();
   if(btn){btn.classList.add('sent');setTimeout(()=>btn.classList.remove('sent'),700)}
 }
@@ -1149,14 +1221,14 @@ function sendTap(){
   hint(tapN>1?tapN+' toques':'Toque enviado · el teléfono de '+S.partner+' vibra');
   clearTimeout(tapTO);tapTO=setTimeout(()=>{
     const n=tapN;tapN=0;S.feed.unshift({from:'m',text:n>1?n+' toques':'Un toque',t:Date.now()});save();renderFeed();
-    netSend({type:'touch',n});
+    netSend({type:'touch',n});pushPartner('Te tocó','Tocá para sentirlo','touch');
   },1200);
 }
 function bindTouch(){
   const cv=$('#field');if(!cv||!field)return;
   let holdTO=null,beatIv=null,holdStart=0,holding=false,downIdx=-1;
   const endHold=()=>{clearTimeout(holdTO);clearInterval(beatIv);if(field)field.hold(-1);
-    if(holding){holding=false;const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();netSend({type:'beat',secs});hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
+    if(holding){holding=false;const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();netSend({type:'beat',secs});pushPartner('Te mandó un latido','De '+secs+' s','beat');hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
   cv.addEventListener('pointerdown',e=>{
     downIdx=field.hit(e.clientX,e.clientY);
     if(downIdx===0){field.ripple(0);vib(8);hint('Esa sos vos. Tocá a '+S.partner);return}
@@ -1251,7 +1323,7 @@ function renderAlarm(){
 function fire(heavy){
   alarmState='sent';S.lastAlarm={heavy:!!heavy,t:Date.now()};save();entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
   S.feed.unshift({from:'m',text:heavy?'Alarma de sueño pesado':'Alarma para despertar',t:Date.now()});save();renderFeed();
-  netSend({type:'alarm',heavy:!!heavy});
+  netSend({type:'alarm',heavy:!!heavy});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Abrí Twin Particles','alarm');
   if(!NET.ready)toast('Guardado · '+S.partner+' no está conectado ahora, no va a sonarle');
 }
 
@@ -1299,8 +1371,8 @@ function stopRing(how){
   const el=$('#ring');if(el)el.remove();
   const r=ringing;ringing=null;if(!r)return;
   if(r.test)return toast(how==='snooze'?'Prueba terminada · se repetiría en 5 min':'Prueba terminada');
-  if(how==='snooze'){S.feed.unshift({from:'m',text:'5 minutos más',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'snooze'});toast(NET.ready?S.partner+' sabe que pediste 5 minutos más':'Guardado · no se pudo avisar a '+S.partner)}
-  else{S.feed.unshift({from:'m',text:'Ya me desperté',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'off'});toast(NET.ready?'Alarma apagada · '+S.partner+' ya lo sabe':'Alarma apagada · no se pudo avisar a '+S.partner)}
+  if(how==='snooze'){S.feed.unshift({from:'m',text:'5 minutos más',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'snooze'});pushPartner('Pidió 5 minutos más','','alarmResp');toast(NET.ready?S.partner+' sabe que pediste 5 minutos más':'Guardado · no se pudo avisar a '+S.partner)}
+  else{S.feed.unshift({from:'m',text:'Ya me desperté',t:Date.now()});save();renderFeed();entangle();netSend({type:'alarmResp',how:'off'});pushPartner('Ya se despertó','','alarmResp');toast(NET.ready?'Alarma apagada · '+S.partner+' ya lo sabe':'Alarma apagada · no se pudo avisar a '+S.partner)}
 }
 
 /* álbumes */
@@ -1709,7 +1781,7 @@ function addItem(L,items){
     q.oninput=()=>{clearTimeout(deb);$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';deb=setTimeout(draw,450)};
     q.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(deb);draw()}};
     const preview=x=>{
-      const it=Object.assign({by:'m',g:hashStr(x.t)},x);
+      const it=Object.assign({by:'m',g:hashStr(x.t),id:uid()},x);
       sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(it,L.kind)}')">${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <span class="label">${[srcLabel(it),it.meta].filter(Boolean).map(esc).join(' · ')}</span>
@@ -1719,7 +1791,7 @@ function addItem(L,items){
         ${has(it.t)?'<div class="note">Ya está en la lista.</div>':''}
         <div class="row"><button class="btn soft" id="pBack" style="flex:1">Buscar otra</button><button class="btn" id="pAdd" style="flex:2">Agregar a ${L.n}</button></div>`,()=>{
         $('#pBack').onclick=()=>addItem(L,items);
-        $('#pAdd').onclick=()=>{items.unshift(it);save();closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
+        $('#pAdd').onclick=()=>{items.unshift(it);save();netSend({type:'listadd',listId:L.id,item:it});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
       });
     };
     $('#manual').onclick=()=>{$('#manual').hidden=true;const m=$('#mform');m.hidden=false;m.innerHTML=manualForm(L);bindManual(L,items)};
@@ -1746,10 +1818,10 @@ function bindManual(L,items){
   $('#af').onchange=e=>{file=e.target.files[0];if(file)$('#afn').textContent=file.name};
   $('#aOk').onclick=()=>{
     const t=$('#at').value.trim();if(!t){$('#aerr').textContent='Falta el '+L.title.toLowerCase()+'.';return $('#at').focus()}
-    const it={t,meta:$('#am').value.trim(),desc:$('#ad').value.trim(),by:'m',g:hashStr(t+Date.now())};
+    const it={t,meta:$('#am').value.trim(),desc:$('#ad').value.trim(),by:'m',g:hashStr(t+Date.now()),id:uid()};
     if(link)Object.assign(it,{url:link.url,src:link.src,host:link.host});
     if(auto&&auto.img)it.img=auto.img;
-    const done=()=>{items.unshift(it);save();closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
+    const done=()=>{items.unshift(it);save();const payload=Object.assign({},it);if(it.k&&blobs[it.k])payload.blob=blobs[it.k];netSend({type:'listadd',listId:L.id,item:payload});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
     if(file){const r=new FileReader();r.onload=()=>{const k=uid();blobs[k]=r.result;it.k=k;done()};r.readAsDataURL(file)}else done();
   };
 }
@@ -1785,7 +1857,7 @@ V.calendario=function(){
     <button class="btn full" id="eOk">Guardar evento</button>`,()=>{
       let w='ambos';document.querySelectorAll('#ew button').forEach(b=>b.onclick=()=>{w=b.dataset.w;document.querySelectorAll('#ew button').forEach(x=>x.classList.toggle('on',x===b))});
       $('#et').focus();
-      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return;S.events.push({id:uid(),d,tm:$('#eh').value,t,who:w});save();selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();entangle();toast('Evento agregado')}});
+      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return;const ev={id:uid(),d,tm:$('#eh').value,t,who:w};S.events.push(ev);save();netSend({type:'eventadd',ev});pushPartner('Agregó un evento',t,'event');selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();entangle();toast('Evento agregado')}});
 };
 
 /* cartas */
@@ -1926,7 +1998,7 @@ function compose(kind0){
         const letter=Object.assign({id:uid(),from:'m',kind,title:t,date:TODAYS,openAt:oa,opened:0},extra);
         S.letters.unshift(letter);if(kind==='text')S.draft=null;save();closeSheet();box='out';V.cartas();entangle();
         const payload=Object.assign({},letter);if(letter.k&&blobs[letter.k])payload.blob=blobs[letter.k];
-        netSend({type:'letter',letter:payload});
+        netSend({type:'letter',letter:payload});pushPartner('Te mandó una carta',t,'letter');
         toast(NET.ready?'Carta enviada a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora, no le llegó todavía')};
       if(kind==='text'){const tx=ta.value.trim();if(!tx){$('#lerr').textContent='La carta está vacía.';return ta.focus()}return done({text:tx,hand:S.prefs.hand,ink:S.prefs.ink})}
       if(!file)return $('#lerr').textContent=kind==='photo'?'Falta la foto de la carta.':'Falta el audio.';
@@ -2278,10 +2350,24 @@ NET.onLetter=d=>{
   S.letters.unshift(clean);save();entangle();updateBadge();push(S.partner,'te mandó una carta');
   if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();
 };
+NET.onListAdd=d=>{
+  const items=S.lists[d.listId];if(!items||!d.item)return;
+  if(items.some(x=>x.id&&x.id===d.item.id))return;
+  const it=Object.assign({},d.item);if(it.blob){blobs[it.k]=it.blob;delete it.blob}
+  it.by='p';items.unshift(it);save();entangle();push(S.partner,'agregó algo a una lista');
+  if(S.tab==='listas'&&!$('#main').hidden)V.listas();
+};
+NET.onEventAdd=d=>{
+  const ev=d.ev;if(!ev||!ev.id)return;
+  if(S.events.some(x=>x.id===ev.id))return;
+  S.events.push(ev);save();entangle();push(S.partner,'agregó un evento: '+ev.t);
+  if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();
+};
 if(S.paired||S.solo){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
+  if(S.paired)ensurePush();
 }else showOnboard();
 })();
 </script>
