@@ -569,7 +569,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.12';
+const VERSION='beta 0.13';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1201,7 +1201,7 @@ const LISTS=[
   {id:'yt',n:'YouTube',kind:'video',title:'Título del video',meta:'Canal y duración',link:'Link del video de YouTube'},
   {id:'pod',n:'Podcasts',kind:'square',title:'Programa o episodio',meta:'Episodio o plataforma',link:'Link de Spotify o YouTube'}
 ];
-const SRC={maps:'Google Maps',ig:'Instagram',yt:'YouTube',spotify:'Spotify',netflix:'Netflix',prime:'Prime Video',disney:'Disney+',max:'Max',imdb:'IMDb',letterboxd:'Letterboxd'};
+const SRC={wiki:'Wikipedia',tvmaze:'TVMaze',apple:'Apple Podcasts',maps:'Google Maps',ig:'Instagram',yt:'YouTube',spotify:'Spotify',netflix:'Netflix',prime:'Prime Video',disney:'Disney+',max:'Max',imdb:'IMDb',letterboxd:'Letterboxd'};
 function parseLink(raw){
   raw=(raw||'').trim();if(!raw)return null;
   let u;try{u=new URL(/^https?:\/\//i.test(raw)?raw:'https://'+raw)}catch(e){return null}
@@ -1251,6 +1251,7 @@ function genThumb(seed,title){
 }
 function coverFor(x,kind){
   if(x.k&&blobs[x.k])return blobs[x.k];
+  if(x.img)return String(x.img).replace(/'/g,'%27').replace(/\)/g,'%29');
   const seed=x.g||hashStr(x.t);
   return kind==='poster'?genPoster(seed,x.t,x.meta):kind==='video'?genThumb(seed,x.t):genArt(seed);
 }
@@ -1358,6 +1359,7 @@ function itemDetail(L,items,i){
       <span class="sub">Agregado por ${esc(x.by==='m'?meName():S.partner)}</span>
     </div>
     ${x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
+    ${L.id==='pelis'&&x.src!=='letterboxd'?`<a class="btn soft full" href="${esc(x.lb||lbSearch(x.t))}" target="_blank" rel="noopener">Ver en Letterboxd</a>`:''}
     <div class="row"><button class="btn soft full" id="dDone">${x.done?'Volver a pendiente':'Marcar como hecho'}</button><button class="btn danger" id="dDel">Quitar</button></div>`,()=>{
     $('#dDone').onclick=()=>{x.done=x.done?0:1;save();closeSheet();V.listas();if(x.done)toast('Hecho')};
     $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();toast('Quitado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
@@ -1431,6 +1433,72 @@ const CAT={
   ]
 };
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+/* buscador en internet: Wikipedia (películas y series), TVMaze (series), YouTube y Apple Podcasts */
+const RS={};
+const jget=(u,ms=6000)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{clearTimeout(t);if(!r.ok)throw new Error(r.status);return r.json()})};
+const stripHtml=s=>String(s||'').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+const clip=(s,n)=>{s=String(s||'').trim();if(s.length<=n)return s;const c=s.slice(0,n);const k=c.lastIndexOf('. ');return(k>n*.5?c.slice(0,k+1):c.replace(/\s+\S*$/,'')+'…')};
+const fmtDur=s=>{s=Math.round(+s||0);if(!s)return'';const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
+const wikiQ=(lang,q,extra)=>`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=8&prop=pageimages|description|pageprops|extracts&exintro=1&explaintext=1&exsentences=3&piprop=thumbnail&pithumbsize=400&ppprop=wikibase_item${extra||''}`;
+const wikiPages=j=>Object.values((j&&j.query&&j.query.pages)||{}).sort((a,b)=>a.index-b.index);
+async function wikiSearch(q,kind){
+  const word=kind==='film'?'película':'serie de televisión',enWord=kind==='film'?'film':'TV series';
+  const okEs=d=>kind==='film'?/película|film|largometraje/i.test(d):/serie|miniserie|programa de televisión|telenovela|anime/i.test(d);
+  const okEn=d=>kind==='film'?/film|movie/i.test(d):/series|miniseries|television|sitcom|anime/i.test(d);
+  const [es,en]=await Promise.allSettled([jget(wikiQ('es',q+' '+word)),jget(wikiQ('en',q+' '+enWord))]);
+  const esP=es.status==='fulfilled'?wikiPages(es.value).filter(p=>okEs((p.description||'')+' '+(p.extract||'').slice(0,160))):[];
+  const enP=en.status==='fulfilled'?wikiPages(en.value).filter(p=>okEn((p.description||'')+' '+(p.extract||'').slice(0,160))):[];
+  if(es.status==='rejected'&&en.status==='rejected')throw new Error('sin conexión');
+  const byQ={};enP.forEach(p=>{const id=p.pageprops&&p.pageprops.wikibase_item;if(id)byQ[id]=p});
+  const out=[],seen=new Set();
+  const push=(p,lang)=>{const id=p.pageprops&&p.pageprops.wikibase_item;if(id&&seen.has(id))return;id&&seen.add(id);
+    const en2=id&&byQ[id];const desc=p.description||'';const blob=desc+' '+(p.extract||'');
+    const year=(desc.match(/\b(18|19|20)\d{2}\b/)||blob.match(/\b(18|19|20)\d{2}\b/)||[])[0]||'';
+    const dirOf=t=>{const m=t.match(/dirigid[ao] por ([A-ZÁÉÍÓÚÑ][^,.;()]+?)(?:\s+y\s|[,.;(]|$)/)||t.match(/directed by ([A-Z][^,.;()]+?)(?:\s+and\s|[,.;(]|$)/)||t.match(/\bby ([A-Z][\wÀ-ÿ'-]+(?: [A-Z][\wÀ-ÿ'-]+){0,3})$/);return m?m[1]:''};
+    const dir=(dirOf(desc)||dirOf(p.extract||'')).split(/\s+(?:es|is|fue|was|que)\s/)[0].slice(0,40);
+    const title=p.title.replace(/\s*\((película|film|serie de televisión|serie|TV series|miniserie|\d{4} film)[^)]*\)\s*$/i,'');
+    const img=(en2&&en2.thumbnail&&en2.thumbnail.source)||(p.thumbnail&&p.thumbnail.source)||'';
+    out.push({t:title,meta:[year,dir.trim()].filter(Boolean).join(' · ')||clip(desc,40),desc:clip(p.extract||desc,320),img,url:`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,src:'wiki',host:lang+'.wikipedia.org'})};
+  esP.forEach(p=>push(p,'es'));enP.forEach(p=>push(p,'en'));
+  return out.slice(0,8);
+}
+async function tvmazeSearch(q){
+  const j=await jget('https://api.tvmaze.com/search/shows?q='+encodeURIComponent(q));
+  return j.slice(0,8).map(({show:s})=>({t:s.name,meta:[(s.premiered||'').slice(0,4),(s.network&&s.network.name)||(s.webChannel&&s.webChannel.name)||''].filter(Boolean).join(' · '),
+    desc:clip(stripHtml(s.summary),320),img:(s.image&&(s.image.original||s.image.medium))||'',url:s.officialSite||s.url,src:'tvmaze',host:'tvmaze.com'}));
+}
+const PIPED=['https://api.piped.private.coffee','https://pipedapi.kavin.rocks','https://pipedapi.adminforge.de','https://pipedapi.r4fo.com'];
+const INVID=['https://inv.nadeko.net','https://invidious.nerdvpn.de','https://yewtu.be'];
+const ytId=u=>{const m=String(u).match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([\w-]{11})/);return m&&m[1]};
+async function youtubeSearch(q){
+  const id=ytId(q);
+  if(id){const j=await jget('https://www.youtube.com/oembed?format=json&url='+encodeURIComponent('https://www.youtube.com/watch?v='+id));
+    return[{t:j.title,meta:j.author_name,desc:'',img:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+id,src:'yt',host:'youtube.com'}]}
+  for(const base of PIPED){try{const j=await jget(base+'/search?filter=videos&q='+encodeURIComponent(q),5000);const items=(j.items||[]).filter(x=>x.type==='stream'&&ytId(x.url));if(!items.length)continue;
+    return items.slice(0,8).map(x=>{const v=ytId(x.url);return{t:x.title,meta:[x.uploaderName,fmtDur(x.duration)].filter(Boolean).join(' · '),desc:clip(x.shortDescription||'',240),img:`https://i.ytimg.com/vi/${v}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+v,src:'yt',host:'youtube.com'}})}catch(e){}}
+  for(const base of INVID){try{const j=await jget(base+'/api/v1/search?type=video&q='+encodeURIComponent(q),5000);if(!Array.isArray(j)||!j.length)continue;
+    return j.slice(0,8).map(x=>({t:x.title,meta:[x.author,fmtDur(x.lengthSeconds)].filter(Boolean).join(' · '),desc:clip(x.description||'',240),img:`https://i.ytimg.com/vi/${x.videoId}/hqdefault.jpg`,url:'https://www.youtube.com/watch?v='+x.videoId,src:'yt',host:'youtube.com'}))}catch(e){}}
+  throw new Error('youtube');
+}
+async function podcastSearch(q){
+  const j=await jget('https://itunes.apple.com/search?media=podcast&entity=podcast&country=AR&limit=8&term='+encodeURIComponent(q));
+  return(j.results||[]).map(p=>({t:p.collectionName,meta:[p.artistName,p.primaryGenreName].filter(Boolean).join(' · '),desc:'',img:p.artworkUrl600||p.artworkUrl100||'',url:p.collectionViewUrl,src:'apple',host:'podcasts.apple.com'}));
+}
+const lbTitle=url=>{const m=String(url).match(/letterboxd\.com\/(?:[^/]+\/)?film\/([^/?#]+)/i);if(!m)return null;return decodeURIComponent(m[1]).replace(/-\d{4}$/,'').replace(/-/g,' ')};
+const lbSearch=t=>'https://letterboxd.com/search/films/'+encodeURIComponent(t)+'/';
+async function searchRemote(listId,q){
+  const key=listId+'|'+norm(q);if(RS[key])return RS[key];
+  let r=[];
+  if(listId==='pelis'){const lb=lbTitle(q);r=await wikiSearch(lb||q,'film');if(lb)r=r.map((x,i)=>i?x:{...x,lb:q.trim()})}
+  else if(listId==='series'){const [w,t]=await Promise.allSettled([wikiSearch(q,'tv'),tvmazeSearch(q)]);
+    const wl=w.status==='fulfilled'?w.value:[],tl=t.status==='fulfilled'?t.value:[];if(w.status==='rejected'&&t.status==='rejected')throw new Error('sin conexión');
+    const seen=new Set(wl.map(x=>norm(x.t)));wl.forEach(x=>{if(!x.img){const m=tl.find(y=>norm(y.t)===norm(x.t));if(m)x.img=m.img}});
+    r=wl.concat(tl.filter(x=>!seen.has(norm(x.t)))).slice(0,8)}
+  else if(listId==='yt')r=await youtubeSearch(q);
+  else if(listId==='pod')r=await podcastSearch(q);
+  return RS[key]=r;
+}
+
 function searchCat(listId,q){
   q=norm(q).trim();if(q.length<2)return[];
   if(listId==='yt')return [];
@@ -1451,17 +1519,22 @@ function addItem(L,items){
     <div class="results" id="sres"><p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p></div>
     <button class="linkbtn" id="manual" style="align-self:flex-start">¿No aparece? Cargalo a mano</button>
     <div id="mform" hidden style="display:flex;flex-direction:column;gap:14px"></div>
-    <p class="sub">${L.id==='yt'?'Pegá el link del video con “Cargalo a mano”.':'Por ahora el buscador conoce pocos títulos. Si no aparece, cargalo a mano.'}</p>`,()=>{
-    let res=[],deb;
+    <p class="sub">${({pelis:'Busca en Wikipedia.',series:'Busca en Wikipedia y TVMaze.',yt:'Busca en YouTube. También podés pegar el link de un video.',pod:'Busca en Apple Podcasts.',rest:'Si no aparece, cargalo a mano y pegá el link de Google Maps o Instagram.'})[L.id]||''}</p>`,()=>{
+    let res=[],deb,tok=0;
     const q=$('#sq');q.focus();
-    const draw=()=>{
-      const v=q.value.trim();
+    const draw=async()=>{
+      const v=q.value.trim(),my=++tok;
       if(v.length<2){$('#sres').innerHTML='<p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p>';return}
-      res=searchCat(L.id,v);
+      let failed=false;
+      if(L.id==='rest')res=searchCat(L.id,v);
+      else{$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';
+        try{res=await searchRemote(L.id,v)}catch(e){failed=true;res=searchCat(L.id,v)}
+        if(my!==tok)return}
+      if(failed&&!res.length){$('#sres').innerHTML=`<p class="sub">No se pudo buscar. Revisá la conexión o cargalo a mano.</p>`;return}
       $('#sres').innerHTML=res.length?res.map((x,i)=>`<button class="res" data-r="${i}">${thumbHTML(Object.assign({g:hashStr(x.t)},x),L.kind)}<span class="itxt"><span class="it">${esc(x.t)}</span><span class="sub">${esc(x.meta)}</span>${has(x.t)?'<span class="tag">Ya está en la lista</span>':''}</span></button>`).join(''):`<p class="sub">No encontramos “${esc(v)}”. Probá con otro nombre o cargalo a mano.</p>`;
       $('#sres').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>preview(res[b.dataset.r]));
     };
-    q.oninput=()=>{clearTimeout(deb);$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';deb=setTimeout(draw,280)};
+    q.oninput=()=>{clearTimeout(deb);$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';deb=setTimeout(draw,450)};
     q.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(deb);draw()}};
     const preview=x=>{
       const it=Object.assign({by:'m',g:hashStr(x.t)},x);
@@ -1491,12 +1564,19 @@ function manualForm(L){return `
 function bindManual(L,items){
   let link=null,file=null;
   $('#at').value=$('#sq').value.trim();$('#at').focus();
-  $('#al').oninput=()=>{link=parseLink($('#al').value);$('#adet').innerHTML=link?`Detectado: <span class="src">${esc(srcLabel(link))}</span>`:($('#al').value.trim()?'No parece un link válido.':'');if(link&&link.name&&!$('#at').value)$('#at').value=link.name};
+  let auto=null,atok=0;
+  $('#al').oninput=()=>{link=parseLink($('#al').value);auto=null;$('#adet').innerHTML=link?`Detectado: <span class="src">${esc(srcLabel(link))}</span>`:($('#al').value.trim()?'No parece un link válido.':'');
+    if(link&&link.src==='letterboxd'&&!link.name)link.name=lbTitle(link.url)?.replace(/\b\w/g,c=>c.toUpperCase())||'';
+    if(link&&link.name&&!$('#at').value)$('#at').value=link.name;
+    // con un link de Letterboxd o de YouTube se completan solos los datos
+    if(link&&((link.src==='letterboxd'&&L.id==='pelis')||(link.src==='yt'&&L.id==='yt'))){const my=++atok;$('#adet').innerHTML+=' · buscando datos…';
+      searchRemote(L.id,link.url).then(r=>{if(my!==atok||!r.length)return;auto=r[0];if(!$('#at').value||$('#at').value===link.name)$('#at').value=auto.t;if(!$('#am').value)$('#am').value=auto.meta||'';if(!$('#ad').value)$('#ad').value=auto.desc||'';$('#adet').innerHTML=`Detectado: <span class="src">${esc(srcLabel(link))}</span> · datos completados`}).catch(()=>{if(my===atok)$('#adet').innerHTML=`Detectado: <span class="src">${esc(srcLabel(link))}</span>`})}};
   $('#af').onchange=e=>{file=e.target.files[0];if(file)$('#afn').textContent=file.name};
   $('#aOk').onclick=()=>{
     const t=$('#at').value.trim();if(!t){$('#aerr').textContent='Falta el '+L.title.toLowerCase()+'.';return $('#at').focus()}
     const it={t,meta:$('#am').value.trim(),desc:$('#ad').value.trim(),by:'m',g:hashStr(t+Date.now())};
     if(link)Object.assign(it,{url:link.url,src:link.src,host:link.host});
+    if(auto&&auto.img)it.img=auto.img;
     const done=()=>{items.unshift(it);save();closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
     if(file){const r=new FileReader();r.onload=()=>{const k=uid();blobs[k]=r.result;it.k=k;done()};r.readAsDataURL(file)}else done();
   };
