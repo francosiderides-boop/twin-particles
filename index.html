@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.17';
+const VERSION='beta 0.18';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1026,7 +1026,7 @@ function send(text,btn){
   text=text.trim();if(!text)return;
   S.feed.unshift({from:'m',text,t:Date.now()});S.feed=S.feed.slice(0,60);save();
   netSend({type:'signal',text});
-  entangle();toast(NET.ready?'Enviado a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora');renderFeed();
+  entangle();toast(S.solo?'Guardado en tu historial':(NET.ready?'Enviado a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora'));renderFeed();
   if(btn){btn.classList.add('sent');setTimeout(()=>btn.classList.remove('sent'),700)}
 }
 function receive(text){S.feed.unshift({from:'p',text,t:Date.now()});save();entangle();push(S.partner,text);renderFeed()}
@@ -1061,7 +1061,7 @@ const V={};
 function go(tab){
   S.tab=tab;save();
   document.querySelectorAll('.tb').forEach(b=>{b.classList.toggle('on',b.dataset.tab===tab);b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false')});
-  $('#pName').textContent=S.partner;
+  $('#pName').textContent=S.solo?'Sin vincular':S.partner;
   if(field&&tab!=='inicio'){field.stop();field=null}
   const idx=['inicio','albumes','listas','calendario','cartas'].indexOf(tab),bl=$('#blob');
   if(bl){bl.style.transform=`translateX(${idx*100}%)`;bl.classList.remove('squish');void bl.offsetWidth;bl.classList.add('squish')}
@@ -1085,6 +1085,33 @@ function updateBadge(){const n=S.letters.filter(l=>l.from==='p'&&!l.opened&&!(l.
 
 /* señales */
 V.inicio=function(){
+  if(S.solo){
+    render(`
+    <section class="pair solo">
+      <canvas id="field" aria-label="Tu partícula, todavía sin vincular"></canvas>
+      <div class="state"><span class="label">Partícula solitaria</span><span class="label">Sin vincular</span></div>
+      <div class="who l" style="left:50%;transform:translateX(-50%)"><span class="label">Spin ↑</span><b style="color:var(--a)">${esc(meName())}</b></div>
+    </section>
+    <div class="field" style="padding:12px;text-align:center">
+      <p class="sub" style="margin-bottom:10px">Estás entrando como partícula solitaria: nada de lo que hagas acá se envía a nadie todavía.</p>
+      <button class="btn lg full" id="goPair">Vincularme con mi pareja</button>
+    </div>
+    <section class="section">
+      <div class="sechead"><h2>Señales</h2><span class="label">Se guardan en tu teléfono</span></div>
+      <div class="chips" id="sigs"></div>
+      <form class="row" id="customF"><input class="input" id="customI" maxlength="80" placeholder="Escribí algo (no se envía, todavía no estás vinculado)" autocomplete="off" aria-label="Mensaje personalizado"><button class="btn">Guardar</button></form>
+    </section>
+    <section class="section">
+      <div class="sechead"><h3>Tu historial</h3><button class="linkbtn" id="allFeed">Ver todas</button></div>
+      <div class="feed" id="feed"></div>
+    </section>`);
+    renderSigs();renderFeed();
+    $('#customF').onsubmit=e=>{e.preventDefault();send($('#customI').value);$('#customI').value=''};
+    $('#allFeed').onclick=()=>sheet(`<h2>Tu historial</h2><div class="feed">${feedHTML(S.feed)}</div>`);
+    $('#goPair').onclick=()=>{if(field){field.stop();field=null}showOnboard()};
+    readColors();makeField($('#field'),0);
+    return;
+  }
   render(`
   <section class="pair">
     <canvas id="field" aria-label="Dos partículas entrelazadas: ${esc(meName())} y ${esc(S.partner)}"></canvas>
