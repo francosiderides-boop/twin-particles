@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.31';
+const VERSION='beta 0.32';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1776,20 +1776,19 @@ async function searchRemote(listId,q){
     const [c,w]=await Promise.allSettled([cinemetaSearch('movie',qq),wikiSearch(qq,'film')]);
     const cl=c.status==='fulfilled'?c.value:[],wl=w.status==='fulfilled'?w.value:[];
     if(c.status==='rejected'&&w.status==='rejected')throw new Error('sin conexión');
-    const seen=new Set(cl.map(x=>norm(x.t)));
-    const wlByT={};wl.forEach(x=>{wlByT[norm(x.t)]=x});
-    cl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc}); // preferir la descripción en español si existe
-    r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).slice(0,8);
+    // la Wikipedia en español casi nunca tiene el mismo título textual que la
+    // base en inglés (p.ej. "El origen" vs "Inception"), así que no alcanza con
+    // "copiar la descripción si coincide el título": directamente va primero
+    // lo que ya vino en español, y lo de Cinemeta (en inglés) completa lo que falte.
+    const seen=new Set(wl.map(x=>norm(x.t)));
+    r=wl.concat(cl.filter(x=>!seen.has(norm(x.t)))).slice(0,8);
     if(lb)r=r.map((x,i)=>i?x:{...x,lb:q.trim()})}
   else if(listId==='series'){const [c,w,t]=await Promise.allSettled([cinemetaSearch('series',q),wikiSearch(q,'tv'),tvmazeSearch(q)]);
     const cl=c.status==='fulfilled'?c.value:[],wl=w.status==='fulfilled'?w.value:[],tl=t.status==='fulfilled'?t.value:[];
     if(c.status==='rejected'&&w.status==='rejected'&&t.status==='rejected')throw new Error('sin conexión');
-    const seen=new Set(cl.map(x=>norm(x.t)));
     wl.forEach(x=>{if(!x.img){const m=tl.find(y=>norm(y.t)===norm(x.t));if(m)x.img=m.img}});
-    const wlByT={};wl.forEach(x=>{wlByT[norm(x.t)]=x});
-    cl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc}); // preferir la descripción en español si existe
-    tl.forEach(x=>{const m=wlByT[norm(x.t)];if(m&&m.desc)x.desc=m.desc});
-    r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).concat(tl.filter(x=>!seen.has(norm(x.t))&&!wl.some(y=>norm(y.t)===norm(x.t)))).slice(0,8)}
+    const seen=new Set(wl.map(x=>norm(x.t)));
+    r=wl.concat(cl.filter(x=>!seen.has(norm(x.t)))).concat(tl.filter(x=>!seen.has(norm(x.t))&&!cl.some(y=>norm(y.t)===norm(x.t)))).slice(0,8)}
   else if(listId==='yt')r=await youtubeSearch(q);
   else if(listId==='pod')r=await podcastSearch(q);
   return RS[key]=r;
