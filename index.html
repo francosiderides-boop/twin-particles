@@ -569,7 +569,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.13';
+const VERSION='beta 0.14';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1435,7 +1435,8 @@ const CAT={
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 /* buscador en internet: Wikipedia (películas y series), TVMaze (series), YouTube y Apple Podcasts */
 const RS={};
-const jget=(u,ms=6000)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{clearTimeout(t);if(!r.ok)throw new Error(r.status);return r.json()})};
+const jget1=(u,ms=6000)=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),ms);return fetch(u,{signal:c.signal}).then(r=>{clearTimeout(t);if(!r.ok)throw new Error(r.status);return r.json()})};
+const jget=async(u,ms=6000)=>{try{return await jget1(u,ms)}catch(e){await new Promise(r=>setTimeout(r,350));return jget1(u,ms)}};
 const stripHtml=s=>String(s||'').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
 const clip=(s,n)=>{s=String(s||'').trim();if(s.length<=n)return s;const c=s.slice(0,n);const k=c.lastIndexOf('. ');return(k>n*.5?c.slice(0,k+1):c.replace(/\s+\S*$/,'')+'…')};
 const fmtDur=s=>{s=Math.round(+s||0);if(!s)return'';const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return(h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')};
@@ -1461,6 +1462,12 @@ async function wikiSearch(q,kind){
     out.push({t:title,meta:[year,dir.trim()].filter(Boolean).join(' · ')||clip(desc,40),desc:clip(p.extract||desc,320),img,url:`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,src:'wiki',host:lang+'.wikipedia.org'})};
   esP.forEach(p=>push(p,'es'));enP.forEach(p=>push(p,'en'));
   return out.slice(0,8);
+}
+const CINEMETA='https://v3-cinemeta.strem.io';
+async function cinemetaSearch(kind,q){
+  const j=await jget(`${CINEMETA}/catalog/${kind}/top/search=${encodeURIComponent(q)}.json`,6000);
+  return (j.metas||[]).slice(0,8).map(m=>({t:m.name,meta:[(m.releaseInfo||'').slice(0,4),(m.genres||[]).slice(0,2).join(', ')].filter(Boolean).join(' · '),
+    desc:clip(m.description||'',320),img:m.poster||'',url:m.imdb_id?('https://www.imdb.com/title/'+m.imdb_id+'/'):'',src:'cinemeta',host:'imdb.com',imdb:m.imdb_id||''}));
 }
 async function tvmazeSearch(q){
   const j=await jget('https://api.tvmaze.com/search/shows?q='+encodeURIComponent(q));
@@ -1489,11 +1496,19 @@ const lbSearch=t=>'https://letterboxd.com/search/films/'+encodeURIComponent(t)+'
 async function searchRemote(listId,q){
   const key=listId+'|'+norm(q);if(RS[key])return RS[key];
   let r=[];
-  if(listId==='pelis'){const lb=lbTitle(q);r=await wikiSearch(lb||q,'film');if(lb)r=r.map((x,i)=>i?x:{...x,lb:q.trim()})}
-  else if(listId==='series'){const [w,t]=await Promise.allSettled([wikiSearch(q,'tv'),tvmazeSearch(q)]);
-    const wl=w.status==='fulfilled'?w.value:[],tl=t.status==='fulfilled'?t.value:[];if(w.status==='rejected'&&t.status==='rejected')throw new Error('sin conexión');
-    const seen=new Set(wl.map(x=>norm(x.t)));wl.forEach(x=>{if(!x.img){const m=tl.find(y=>norm(y.t)===norm(x.t));if(m)x.img=m.img}});
-    r=wl.concat(tl.filter(x=>!seen.has(norm(x.t)))).slice(0,8)}
+  if(listId==='pelis'){const lb=lbTitle(q);const qq=lb||q;
+    const [c,w]=await Promise.allSettled([cinemetaSearch('movie',qq),wikiSearch(qq,'film')]);
+    const cl=c.status==='fulfilled'?c.value:[],wl=w.status==='fulfilled'?w.value:[];
+    if(c.status==='rejected'&&w.status==='rejected')throw new Error('sin conexión');
+    const seen=new Set(cl.map(x=>norm(x.t)));
+    r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).slice(0,8);
+    if(lb)r=r.map((x,i)=>i?x:{...x,lb:q.trim()})}
+  else if(listId==='series'){const [c,w,t]=await Promise.allSettled([cinemetaSearch('series',q),wikiSearch(q,'tv'),tvmazeSearch(q)]);
+    const cl=c.status==='fulfilled'?c.value:[],wl=w.status==='fulfilled'?w.value:[],tl=t.status==='fulfilled'?t.value:[];
+    if(c.status==='rejected'&&w.status==='rejected'&&t.status==='rejected')throw new Error('sin conexión');
+    const seen=new Set(cl.map(x=>norm(x.t)));
+    wl.forEach(x=>{if(!x.img){const m=tl.find(y=>norm(y.t)===norm(x.t));if(m)x.img=m.img}});
+    r=cl.concat(wl.filter(x=>!seen.has(norm(x.t)))).concat(tl.filter(x=>!seen.has(norm(x.t))&&!wl.some(y=>norm(y.t)===norm(x.t)))).slice(0,8)}
   else if(listId==='yt')r=await youtubeSearch(q);
   else if(listId==='pod')r=await podcastSearch(q);
   return RS[key]=r;
