@@ -504,7 +504,6 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .pair canvas{touch-action:none;-webkit-user-select:none;user-select:none}
 .brandrow{display:flex;align-items:center;gap:8px}
 .vtag{font-size:11px;font-weight:600;color:var(--muted);opacity:.7;padding:3px 7px;border-radius:99px;transition:opacity .2s,background .2s}
-.vtag:hover,.vtag:focus-visible{opacity:1;background:var(--glass-bg)}
 .touch-hint{display:block;width:100%;margin-top:10px;text-align:center;font-size:13px;font-weight:600;color:var(--muted);padding:4px 8px;transition:color .25s}
 .touch-hint.live{color:var(--b)}
 .touch-hint span{display:inline-block}
@@ -519,7 +518,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 <div id="main" hidden>
   <div class="app">
     <header class="top">
-      <span class="brandrow"><span id="isoTop" aria-label="Twin Particles" role="img"></span><button class="vtag" id="vtag" aria-label="Versión y novedades"></button></span>
+      <span class="brandrow"><span id="isoTop" aria-label="Twin Particles" role="img"></span><span class="vtag" id="vtag"></span></span>
       <div class="top-r">
         <span class="pill"><span class="dot"></span><span id="pName"></span></span>
         <button class="iconbtn" id="openSettings" aria-label="Ajustes"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -542,8 +541,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <script>
 (function(){
-const VERSION='beta 0.8';
+const VERSION='beta 0.9';
 const CHANGELOG=[
+  ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
   ['beta 0.7',['Al vincularte elegís el color de tu partícula, con vista previa en vivo','Ocho colores para elegir; se cambia también desde Ajustes','Nueva tipografía en etiquetas, fechas y horarios','Restaurar los datos de ejemplo ahora pide confirmación escribiendo BORRAR','Corregido: etiquetas de tareas y nombres de las partículas que se superponían']],
   ['beta 0.6',['Estética liquid glass: barra de pestañas flotante, encabezado, tarjetas, hojas y avisos de vidrio','Fondo con luz ambiental que se mueve muy lento','Gota de vidrio que se desliza entre pestañas','Entradas escalonadas al cambiar de sección','Micro-animaciones al tocar, enviar señales, tildar y abrir o cerrar paneles','Todo se desactiva si el teléfono tiene activado reducir movimiento']],
@@ -664,63 +664,22 @@ const TOK=['bg','surface','surface2','fg','muted','line','a','b','ok','warn'];
 
 /* ---------- estado ---------- */
 const DEF={
-  v:VERSION,paired:false,prefs:{vib:true,sound:true,tone:'entrelazado'},pairedAt:null,me:'',partner:'Luna',skin:'auto',tab:'inicio',
+  v:VERSION,paired:false,prefs:{vib:true,sound:true,tone:'entrelazado'},pairedAt:null,me:'',partner:'',skin:'auto',tab:'inicio',
   signals:['Te amo','Te extraño','Tengo hambre','Vamos','Es tarde','Tengo sueño','Ya llego','Llamame'],
-  feed:[{from:'p',text:'Salgo del trabajo',t:now-1000*60*42},{from:'m',text:'Tengo hambre',t:now-1000*60*38},{from:'p',text:'Vamos',t:now-1000*60*37}],
-  albums:[
-    {id:'a1',name:'Mar del Plata',date:'2026-01-14',photos:[{g:1},{g:2},{g:3},{g:4},{g:5}]},
-    {id:'a2',name:'Primer departamento',date:'2026-04-02',photos:[{g:6},{g:7},{g:8}]},
-    {id:'a3',name:'Cumpleaños',date:'2026-08-09',photos:[{g:9},{g:10},{g:11},{g:12}]}
-  ],
-  lists:{
-    tareas:[
-      {t:'Pagar el alquiler',who:'m',due:'+2',by:'p'},
-      {t:'Comprar regalo para el cumple de mamá',who:'ambos',due:'+5',by:'m'},
-      {t:'Llamar al plomero por la canilla',who:'p',due:'-1',by:'m'},
-      {t:'Sacar turno para renovar el DNI',who:'p',due:'',by:'p'},
-      {t:'Lavar el auto',who:'m',due:'',by:'m',done:1,doneBy:'m'}],
-    rest:[
-      {t:'Don Julio',meta:'Parrilla · Palermo',desc:'Parrilla clásica de Palermo. Hay que reservar con varias semanas de anticipación.',url:'https://www.google.com/maps/place/Don+Julio',src:'maps',host:'google.com',by:'p',g:21},
-      {t:'Ramen bar del barrio',meta:'Japonesa · Villa Crespo',desc:'Vimos el reel del tonkotsu. Abre los domingos a la noche.',url:'https://www.instagram.com/ramenbardelbarrio',src:'ig',host:'instagram.com',by:'m',g:34},
-      {t:'Café San Juan',meta:'Cocina de autor · San Telmo',desc:'Fuimos en septiembre. Volver por las rabas.',url:'https://www.google.com/maps/place/Caf%C3%A9+San+Juan',src:'maps',host:'google.com',by:'m',done:1,g:15}],
-    pelis:[
-      {t:'Past Lives',meta:'2023 · Celine Song',desc:'Dos amigos de la infancia se reencuentran en Nueva York veinte años después y se preguntan qué pudo haber sido.',by:'p',g:41},
-      {t:'Before Sunrise',meta:'1995 · Richard Linklater',desc:'Dos desconocidos se conocen en un tren y pasan una sola noche caminando por Viena.',by:'p',g:52},
-      {t:'Interstellar',meta:'2014 · Christopher Nolan',desc:'Un grupo de astronautas cruza un agujero de gusano buscando un nuevo hogar para la humanidad.',by:'m',done:1,g:63}],
-    series:[
-      {t:'Severance',meta:'Temporada 2',desc:'Empleados con la memoria dividida entre su vida en la oficina y su vida personal.',by:'m',g:74},
-      {t:'Normal People',meta:'Miniserie · 12 episodios',desc:'Dos jóvenes de un pueblo irlandés se acercan y se alejan una y otra vez durante sus años de estudio.',by:'p',g:85}],
-    yt:[
-      {t:'Ñoquis caseros paso a paso',meta:'Canal de cocina · 12:40',desc:'Para hacer el 29. Receta con papa y sin huevo.',url:'https://www.youtube.com/results?search_query=%C3%B1oquis+caseros',src:'yt',host:'youtube.com',by:'p',g:96},
-      {t:'Caminata nocturna por Tokio',meta:'Canal de viajes · 48:15',desc:'Para poner de fondo un domingo a la noche.',url:'https://www.youtube.com/results?search_query=tokyo+night+walk',src:'yt',host:'youtube.com',by:'m',g:17}],
-    pod:[
-      {t:'Radiolab',meta:'Episodio sobre el tiempo',desc:'Para escuchar en el auto en el próximo viaje.',by:'m',g:47}]
-  },
-  events:[
-    {id:'e1',d:'2026-10-21',tm:'21:00',t:'Cena en casa',who:'ambos'},
-    {id:'e2',d:'2026-10-24',tm:'20:30',t:'Reserva en Don Julio',who:'ambos'},
-    {id:'e3',d:'2026-10-27',tm:'09:00',t:'Turno médico',who:'p'},
-    {id:'e4',d:'2026-10-29',tm:'13:00',t:'Ñoquis del 29',who:'ambos'},
-    {id:'e5',d:'2026-11-14',tm:'',t:'Aniversario · 3 años',who:'ambos'},
-    {id:'e6',d:'2026-10-17',tm:'18:00',t:'Partido de fútbol',who:'m'}
-  ],
-  letters:[
-    {id:'l5',from:'p',kind:'text',title:'Una carta sin motivo',date:'2026-10-20',opened:0,hand:'kalam',ink:'azul',text:'No pasó nada especial hoy, y justamente por eso te escribo.\n\nMe gusta que lo normal sea con vos: el mate de la mañana, pelear por la última medialuna, quedarnos hablando hasta tarde.\n\nGracias por elegirme todos los días.'},
-    {id:'l1',from:'p',kind:'photo',title:'Para cuando vuelvas tarde',date:'2026-10-19',opened:0,sample:1},
-    {id:'l2',from:'p',kind:'audio',title:'Una canción que te debía',date:'2026-10-12',opened:1,sample:1},
-    {id:'l3',from:'p',kind:'photo',title:'Abrir en nuestro aniversario',date:'2026-10-02',openAt:'2026-11-14',opened:0,sample:1},
-    {id:'l4',from:'m',kind:'audio',title:'Buenos días desde el tren',date:'2026-10-08',opened:1,sample:1}
-  ]
+  feed:[],
+  albums:[],
+  lists:{tareas:[],rest:[],pelis:[],series:[],yt:[],pod:[]},
+  events:[],
+  letters:[]
 };
 let S;
-DEF.lists.tareas.forEach(x=>{if(x.due)x.due=addDays(+x.due)});
 try{S=JSON.parse(localStorage.getItem('tp-state'))}catch(e){}
 if(!S||!S.lists)S=JSON.parse(JSON.stringify(DEF));
 if(!S.prefs)S.prefs={vib:true,sound:true,tone:'entrelazado'};
-if(!S.lists.tareas)S.lists.tareas=JSON.parse(JSON.stringify(DEF.lists.tareas));
-if(!S.letters.some(l=>l.id==='l5'))S.letters.unshift(JSON.parse(JSON.stringify(DEF.letters[0])));
-if(S.v!==VERSION){if(S.v==='beta 0.0')S.lists=JSON.parse(JSON.stringify(DEF.lists));S.v=VERSION;if(S.paired===undefined)S.paired=false;if(S.me==='Vos')S.me=''}
+if(!S.lists.tareas)S.lists.tareas=[];
+if(S.v!==VERSION){const old=parseFloat(String(S.v).replace('beta ',''))||0;if(old<0.9){['feed','albums','events','letters'].forEach(k=>S[k]=[]);S.lists=JSON.parse(JSON.stringify(DEF.lists));S.ignored=0;S.lastHeavy=0;S.draft=null}S.v=VERSION;if(S.paired===undefined)S.paired=false;if(S.me==='Vos')S.me=''}
 const meName=()=>'Vos';
+if(!S.partner)S.partner='Mi pareja';
 const blobs={};
 function save(){try{localStorage.setItem('tp-state',JSON.stringify(S))}catch(e){}}
 
@@ -845,7 +804,7 @@ function obGo(step){
       <div class="code" id="obCode">${pretty}</div>
       <div class="row"><button class="btn soft full" id="obCopy">Copiar código</button></div>
       <div class="waiting"><span class="spin"></span><span>Esperando a tu pareja · vence en <b id="obT" style="font-variant-numeric:tabular-nums">10:00</b></span></div>
-      <div class="note">Prototipo: tu pareja no está conectada de verdad. <button class="linkbtn" id="obSim" style="color:var(--a)">Simular que ingresó el código</button></div>
+      <button class="btn soft full" id="obSim">Mi pareja ya ingresó el código</button>
       <button class="btn ghost full" id="obBack">Cancelar</button></div>`;
     let left=600;ob.timer=setInterval(()=>{left--;const e=$('#obT');if(!e||left<0)return clearInterval(ob.timer);e.textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0')},1000);
     $('#obCopy').onclick=()=>{const done=()=>{toast('Código copiado')};try{navigator.clipboard.writeText(ob.code).then(done,()=>{selectText($('#obCode'));toast('Seleccionado, copialo manualmente')})}catch(e){selectText($('#obCode'))}};
@@ -924,20 +883,17 @@ function enterApp(){
   $('#onboard').hidden=true;$('#onboard').innerHTML='';$('#main').hidden=false;
   $('#isoTop').innerHTML=ISO(34);
   $('#vtag').textContent=VERSION;
-  $('#vtag').onclick=()=>sheet(`<div style="display:flex;justify-content:center;padding-block:4px">${LOGO(30)}</div><div class="ver">Estás usando la ${VERSION}</div><div class="changelog">${CHANGELOG.map(([v,l])=>`<div><b>${v}</b>${v===VERSION?' <span class="tag new">Actual</span>':''}<ul>${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div><button class="btn soft full" id="vOk">Cerrar</button>`,()=>$('#vOk').onclick=closeSheet);
   go(S.tab||'inicio');
 }
 
 /* =========================================================
    APP
    ========================================================= */
-const REPLIES=['Yo también','Te quiero más','Ya voy','Dale','Jaja sí','Llego en 10'];
 function send(text,btn){
   text=text.trim();if(!text)return;
   S.feed.unshift({from:'m',text,t:Date.now()});S.feed=S.feed.slice(0,60);save();
   entangle();toast('Enviado a '+S.partner);renderFeed();
   if(btn){btn.classList.add('sent');setTimeout(()=>btn.classList.remove('sent'),700)}
-  if(Math.random()<.55)setTimeout(()=>receive(REPLIES[Math.floor(Math.random()*REPLIES.length)]),2600+Math.random()*1500);
 }
 function receive(text){S.feed.unshift({from:'p',text,t:Date.now()});save();entangle();push(S.partner,text);renderFeed()}
 
@@ -1029,7 +985,6 @@ function sendTap(){
   hint(tapN>1?tapN+' toques':'Toque enviado · el teléfono de '+S.partner+' vibra');
   clearTimeout(tapTO);tapTO=setTimeout(()=>{
     const n=tapN;tapN=0;S.feed.unshift({from:'m',text:n>1?n+' toques':'Un toque',t:Date.now()});save();renderFeed();
-    if(Math.random()<.4)setTimeout(()=>{if(!field)return;field.ripple(0);vib([30,60,30,60,30]);S.feed.unshift({from:'p',text:'Te devolvió el toque',t:Date.now()});save();renderFeed();hint(S.partner+' te devolvió el toque',2600)},1800+Math.random()*1500);
   },1200);
 }
 function bindTouch(){
@@ -1097,17 +1052,12 @@ function renderAlarm(){
       <div class="field"><span class="flabel">Cuando te despierten a vos, suena</span>
         <div class="chips" id="tones">${Object.entries(TONES).map(([k,v])=>`<button class="chip ${S.prefs.tone===k?'on':''}" data-t="${k}" aria-pressed="${S.prefs.tone===k}">${v}</button>`).join('')}</div></div>
       <div class="row"><button class="btn soft" id="aTest" style="flex:1">Probar alarma</button><button class="btn soft" id="aHeavyT" style="flex:1">Probar pesado</button></div>
-      <button class="btn soft full" id="aSim">${simTO?'Cancelar simulación':'Simular que te despiertan en 10 s'}</button>`;
+`;
     if(heavy){holdButton($('#hHold'),$('#hFill'),1800,()=>fire(true));$('#hold2').onclick=()=>{fire(false)}}
     else holdButton($('#hold'),$('#fill'),1400,()=>fire(false));
     document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{S.prefs.tone=b.dataset.t;save();document.querySelectorAll('[data-t]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b)});AU.preview(b.dataset.t)});
     $('#aTest').onclick=()=>ringIncoming(S.partner,true,false);
     $('#aHeavyT').onclick=()=>ringIncoming(S.partner,true,true);
-    $('#aSim').onclick=()=>{
-      if(simTO){clearTimeout(simTO);simTO=null;renderAlarm();return toast('Simulación cancelada')}
-      AU.unlock();simTO=setTimeout(()=>{simTO=null;ringIncoming(S.partner,false,false);renderAlarm()},10000);renderAlarm();
-      toast('En 10 s te despierta '+S.partner+'. Dejá la app abierta');
-    };
   }else if(alarmState==='ring'||alarmState==='heavy'){
     const hv=alarmState==='heavy';
     el.innerHTML=`<div class="ringing live ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado sonando':'Sonando'} en el teléfono de ${esc(S.partner)}</b><div class="sub">${hv?'Volumen máximo · sirena · vibración continua':'Volumen en aumento · vibrando'}</div></div></div>
@@ -1115,8 +1065,14 @@ function renderAlarm(){
       <button class="btn soft full" id="stopA">Detener alarma</button>`;
     const dur=hv?7000:8000,st=performance.now();const tick=()=>{const b=$('#rbar');if(!b||alarmState==='idle')return;b.style.width=Math.min(100,(performance.now()-st)/dur*100)+'%';if(performance.now()-st<dur)requestAnimationFrame(tick)};tick();
     $('#stopA').onclick=()=>{clearTimeout(alarmTO);alarmState='idle';renderAlarm();toast('Alarma detenida')};
+  }else if(alarmState==='sent'){
+    const hv=S.lastAlarm&&S.lastAlarm.heavy;
+    el.innerHTML=`<div class="ringing ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado enviado':'Alarma enviada'} a ${esc(S.partner)}</b><div class="sub">${hhmm(S.lastAlarm.t)}</div></div></div>
+      <div class="row"><button class="btn soft" id="markIgn" style="flex:1">No se despertó</button><button class="btn" id="resetA" style="flex:1">Se despertó</button></div>`;
+    $('#resetA').onclick=()=>{S.ignored=0;save();alarmState='idle';renderAlarm();toast('Contador de alarmas reiniciado')};
+    $('#markIgn').onclick=()=>{S.ignored=Math.min(HEAVY_AT,(S.ignored||0)+1);save();alarmState='ignored';renderAlarm();if(S.ignored===HEAVY_AT){vib([40,40,40]);toast('Sueño pesado desbloqueado')}};
   }else if(alarmState==='ignored'){
-    el.innerHTML=`<div class="ringing"><span class="bell" style="background:var(--muted)">${ICON.bell}</span><div><b>${esc(S.partner)} no respondió</b><div class="sub">La alarma sonó y nadie la apagó</div></div></div>
+    el.innerHTML=`<div class="ringing"><span class="bell" style="background:var(--muted)">${ICON.bell}</span><div><b>${esc(S.partner)} no respondió</b><div class="sub">Quedó anotada como ignorada</div></div></div>
       ${ignoredDots(n)}
       ${heavy?`<div class="note"><b>Se desbloqueó Sueño pesado.</b> Ya podés usar la alarma más potente.</div>`:''}
       <button class="btn ${heavy?'':'soft'} full" id="resetA">${heavy?'Ver Sueño pesado':'Volver a intentar'}</button>`;
@@ -1127,14 +1083,9 @@ function renderAlarm(){
     $('#resetA').onclick=()=>{alarmState='idle';S.lastHeavy=0;save();renderAlarm()};
   }
 }
-// Prototipo: las alarmas normales a veces quedan sin respuesta; Sueño pesado siempre despierta.
 function fire(heavy){
-  alarmState=heavy?'heavy':'ring';entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
-  const missed=!heavy&&((S.ignored||0)<HEAVY_AT-1?Math.random()<.75:Math.random()<.85);
-  alarmTO=setTimeout(()=>{
-    if(missed){S.ignored=(S.ignored||0)+1;save();alarmState='ignored';renderAlarm();if(S.ignored===HEAVY_AT){vib([40,40,40]);toast('Sueño pesado desbloqueado')}}
-    else{if(heavy)S.lastHeavy=(S.ignored||0)+1;S.ignored=0;save();alarmState='woke';receive(heavy?'Ya está, ya me desperté':'Ya me desperté, gracias');renderAlarm()}
-  },heavy?7000:8000);
+  alarmState='sent';S.lastAlarm={heavy:!!heavy,t:Date.now()};save();entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
+  S.feed.unshift({from:'m',text:heavy?'Alarma de sueño pesado':'Alarma para despertar',t:Date.now()});save();renderFeed();
 }
 
 /* pantalla de alarma entrante */
@@ -1318,7 +1269,6 @@ function bindTasks(L,items){
   document.querySelectorAll('.task [data-o]').forEach(b=>{b.onclick=()=>taskForm(L,items,items[b.dataset.o],+b.dataset.o);b.onkeydown=e=>{if(e.key==='Enter')b.click()}});
   document.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{
     const x=items[b.dataset.n];S.feed.unshift({from:'m',text:'Recordatorio: '+x.t,t:Date.now()});save();entangle();toast('Le recordaste a '+S.partner);
-    if(Math.random()<.5)setTimeout(()=>{if(x.done)return;x.done=1;x.doneBy='p';save();push(S.partner,'Listo: '+x.t);if(S.tab==='listas'&&curList==='tareas'&&!$('.scrim'))V.listas()},3500);
   });
 }
 function taskForm(L,items,x,idx){
@@ -1384,7 +1334,7 @@ function itemDetail(L,items,i){
     $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();toast('Quitado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
   });
 }
-/* buscador: en el prototipo usa un catálogo de ejemplo */
+/* buscador: catálogo inicial reducido */
 const mapsURL=q=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q);
 const F=(t,alt,year,dir,desc)=>({t,alt,meta:year+' · '+dir,desc});
 const CAT={
@@ -1454,13 +1404,7 @@ const CAT={
 const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
 function searchCat(listId,q){
   q=norm(q).trim();if(q.length<2)return[];
-  if(listId==='yt'){
-    const Q=q.charAt(0).toUpperCase()+q.slice(1),url='https://www.youtube.com/results?search_query='+encodeURIComponent(q);
-    return [
-      {t:Q+' · paso a paso',meta:'Resultado de ejemplo · 12:40',desc:'Video explicado de principio a fin.',url,src:'yt',host:'youtube.com'},
-      {t:Q+' en 10 minutos',meta:'Resultado de ejemplo · 10:05',desc:'La versión corta para ver juntos.',url,src:'yt',host:'youtube.com'},
-      {t:'Todo sobre '+q,meta:'Resultado de ejemplo · 34:18',desc:'Un repaso largo para un domingo tranquilo.',url,src:'yt',host:'youtube.com'}];
-  }
+  if(listId==='yt')return [];
   const words=q.split(/\s+/);
   return (CAT[listId]||[]).filter(x=>{const h=norm(x.t+' '+(x.alt||'')+' '+x.meta);return words.every(w=>h.includes(w))}).slice(0,6).map(x=>{
     const it={t:x.t,meta:x.meta,desc:x.desc};
@@ -1478,7 +1422,7 @@ function addItem(L,items){
     <div class="results" id="sres"><p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p></div>
     <button class="linkbtn" id="manual" style="align-self:flex-start">¿No aparece? Cargalo a mano</button>
     <div id="mform" hidden style="display:flex;flex-direction:column;gap:14px"></div>
-    <p class="sub">Prototipo: busca en un catálogo de ejemplo. En la app final busca en ${SEARCH_SRC[L.id]}.</p>`,()=>{
+    <p class="sub">${L.id==='yt'?'Pegá el link del video con “Cargalo a mano”.':'Por ahora el buscador conoce pocos títulos. Si no aparece, cargalo a mano.'}</p>`,()=>{
     let res=[],deb;
     const q=$('#sq');q.focus();
     const draw=()=>{
@@ -1635,7 +1579,7 @@ async function openLetter(l){
   if(locked){sheet(`<h2>${esc(l.title)}</h2><p class="sub">${esc(S.partner)} pidió que esta carta se abra el ${fmtLong(l.openAt)}. Ese día te llega un aviso.</p><button class="btn full" id="ok">Entendido</button>`,()=>$('#ok').onclick=closeSheet);return}
   let body='';
   if(l.kind==='text')body=paperHTML(l,l.from==='p'?S.partner:'');
-  else if(l.kind==='photo'){const src=l.sample?await genPaper():blobs[l.k];body=src?`<img class="paper" src="${src}" alt="Foto de una carta escrita a mano">`:'<div class="note">La foto se subió en otra sesión del prototipo y no quedó guardada.</div>'}
+  else if(l.kind==='photo'){const src=l.sample?await genPaper():blobs[l.k];body=src?`<img class="paper" src="${src}" alt="Foto de una carta escrita a mano">`:'<div class="note">Esta foto no quedó guardada en este teléfono.</div>'}
   else body=`<div class="player"><button class="play" id="pl" aria-label="Reproducir"><svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button><div class="prog"><i id="pg"></i></div><span class="label" id="pt">0:00</span></div>${l.sample?'<p class="sub">Audio de ejemplo generado por el prototipo.</p>':''}`;
   sheet(`<span class="label">${l.from==='p'?'De '+esc(S.partner):'Para '+esc(S.partner)} · ${fmtD(l.date)}</span><h2>${esc(l.title)}</h2>${body}<button class="btn soft full" id="cl">Cerrar</button>`,()=>{
     $('#cl').onclick=closeSheet;
@@ -1682,7 +1626,7 @@ function compose(kind0){
       $('#kText').hidden=k!=='text';$('#kFile').hidden=k==='text';$('#lerr').textContent='';
       if(k!=='text'){$('#lf').accept=k==='photo'?'image/*':'audio/*';$('#lf').value='';$('#fname').textContent=k==='photo'?'Elegir foto':'Elegir audio';
         $('#flab').textContent=k==='photo'?'Foto de tu carta escrita a mano':'Tu mensaje de voz';
-        $('#knote').textContent=k==='photo'?`Sacale una foto con buena luz. ${S.partner} la va a ver cuando abra el sobre.`:'En la app final vas a grabar acá mismo. En el prototipo, subí un audio grabado con tu teléfono.'}
+        $('#knote').textContent=k==='photo'?`Sacale una foto con buena luz. ${S.partner} la va a ver cuando abra el sobre.`:'Subí un audio grabado con tu teléfono.'}
       else{grow()}};
     document.querySelectorAll('#kd button').forEach(b=>b.onclick=()=>{if(b.dataset.k==='text'&&!S.prefs.hand){keep();return pickHand(()=>compose('text'),true)}setKind(b.dataset.k)});
     setKind(kind1);
@@ -1717,11 +1661,9 @@ $('#openSettings').onclick=()=>{
      <button class="btn soft full" id="phand">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button></div>
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
      <div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div>
-     <div><span>Teléfono de ${esc(S.partner)}</span><span class="sub"><span class="dot" style="display:inline-block;margin-right:6px"></span>Conectado</span></div></div>
+     <div><span>Teléfono de ${esc(S.partner)}</span><span class="sub">Sin sincronizar todavía</span></div></div>
      <button class="btn danger full" id="unpair">Desvincular teléfonos</button></div>
-   <div class="field"><span class="flabel">Novedades</span><div class="changelog">${CHANGELOG.map(([v,l])=>`<div><b>${v}</b>${v===VERSION?' <span class="tag new">Actual</span>':''}<ul>${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div></div>
-   <p class="note">Prototipo: los datos son de ejemplo, ${esc(S.partner)} y las notificaciones se simulan, y todo se guarda solo en este navegador.</p>
-   <div class="row"><button class="btn soft full" id="reset">Restaurar ejemplo</button><button class="btn full" id="sOk">Listo</button></div>
+   <div class="row"><button class="btn soft full" id="reset">Borrar todo</button><button class="btn full" id="sOk">Listo</button></div>
    <div class="ver">Twin Particles · ${VERSION}</div>`,()=>{
     document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{S.skin=b.dataset.s;save();applySkin();document.querySelectorAll('[data-s]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',x===b)});entangle()});
     $('#pv').onchange=e=>{S.prefs.vib=e.target.checked;save();if(S.prefs.vib)vib(60)};
@@ -1729,10 +1671,10 @@ $('#openSettings').onclick=()=>{
     $('#ptest').onclick=()=>{closeSheet();setTimeout(()=>push(S.partner,'Te extraño'),300)};
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
-    $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Luna';save();closeSheet();go(S.tab)};
-    $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo y volver a los datos de ejemplo?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas que cargaste. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
+    $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
+    $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
-      $('#si').onclick=()=>{const keep={skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Datos de ejemplo restaurados')}});
+      $('#si').onclick=()=>{const keep={skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
     $('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#si').onclick=()=>{S.paired=false;S.pairedAt=null;save();closeSheet();if(field){field.stop();field=null}showOnboard()}});
   });
@@ -1751,7 +1693,6 @@ applySkin();
 if(S.paired){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
-  setTimeout(()=>{if(S.tab==='inicio'&&!$('#main').hidden)receive('Te extraño')},2500);
 }else showOnboard();
 })();
 </script>
