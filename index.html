@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.30';
+const VERSION='beta 0.31';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -796,6 +796,7 @@ function netWire(conn){
     else if(d.type==='listedit'&&NET.onListEdit)NET.onListEdit(d);
     else if(d.type==='eventdel'&&NET.onEventDel)NET.onEventDel(d);
     else if(d.type==='unpair'&&NET.onUnpair)NET.onUnpair();
+    else if(d.type==='remind'&&NET.onRemind)NET.onRemind(d);
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
@@ -1553,7 +1554,7 @@ function bindTasks(L,items){
   document.querySelectorAll('.task [data-c]').forEach(b=>b.onclick=()=>{const x=items[b.dataset.c];x.done=x.done?0:1;x.doneBy=x.done?'m':null;save();V.listas();if(x.id)netSendSure({type:'listdone',listId:L.id,id:x.id,done:x.done,doneBy:x.doneBy});if(x.done){toast('Tarea hecha · '+S.partner+' lo va a ver');vib(12);entangle()}});
   document.querySelectorAll('.task [data-o]').forEach(b=>{b.onclick=()=>taskForm(L,items,items[b.dataset.o],+b.dataset.o);b.onkeydown=e=>{if(e.key==='Enter')b.click()}});
   document.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{
-    const x=items[b.dataset.n];S.feed.unshift({from:'m',text:'Recordatorio: '+x.t,t:Date.now()});save();entangle();toast('Le recordaste a '+S.partner);
+    const x=items[b.dataset.n];S.feed.unshift({from:'m',text:'Recordatorio: '+x.t,t:Date.now()});save();entangle();netSendSure({type:'remind',text:x.t});pushPartner('Te mandó un recordatorio',x.t,'remind');toast('Le recordaste a '+S.partner);
   });
 }
 function taskForm(L,items,x,idx){
@@ -2456,6 +2457,10 @@ NET.onEventDel=d=>{
   if(!d.id)return;
   S.events=S.events.filter(e=>e.id!==d.id);save();
   if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();
+};
+NET.onRemind=d=>{
+  S.feed.unshift({from:'p',text:'Recordatorio: '+d.text,t:Date.now()});save();entangle();
+  push(S.partner,'te mandó un recordatorio: '+d.text);renderFeed&&renderFeed();
 };
 NET.onUnpair=()=>{
   S.paired=false;S.solo=true;S.pairedAt=null;S.partnerPeerId=null;

@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.30';
+const CACHE='tp-beta-0.31';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -22,7 +22,8 @@ const VIB={
   alarmResp:[15,50,15],
   event:[40,50,40,50,40],
   list:[40,50,40,50,40],
-  touch:[18,60,18]
+  touch:[18,60,18],
+  remind:[30,40,30,40,30]
 };
 self.addEventListener('push',e=>{
   let d={};try{d=e.data?e.data.json():{}}catch(err){}
