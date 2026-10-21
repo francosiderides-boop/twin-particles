@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.25';
+const VERSION='beta 0.26';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -759,7 +759,15 @@ function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}
 // apenas vuelva a conectar (al abrir la app, al reconectar, etc).
 function netSendSure(msg){
   netSend(msg);
-  if(!NET.ready){S.outbox=S.outbox||[];S.outbox.push(msg);save()}
+  if(!NET.ready){
+    S.outbox=S.outbox||[];
+    S.outbox.push(Object.assign({t:Date.now()},msg));
+    // si nunca se reconecta (se desvincularon, desinstaló, etc) esto no
+    // puede crecer para siempre: se guarda como mucho 1 mes y 300 avisos
+    const cut=Date.now()-30*24*3600*1000;
+    S.outbox=S.outbox.filter(m=>!m.t||m.t>cut).slice(-300);
+    save();
+  }
 }
 function flushOutbox(){
   if(!NET.ready||!S.outbox||!S.outbox.length)return;
