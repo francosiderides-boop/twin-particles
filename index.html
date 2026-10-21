@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.20';
+const VERSION='beta 0.21';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -2334,8 +2334,8 @@ new MutationObserver(readColors).observe(document.documentElement,{attributes:tr
 applySkin();
 mfLoadSaved();
 NET.onSignal=d=>receive(d.text);
-NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();vib(d.n>1?[18,60,18,60,18]:14);entangle();push(S.partner,'te tocó');renderFeed&&renderFeed()};
-NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();vib([40,70,40,70,40]);entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');renderFeed&&renderFeed()};
+NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();entangle();push(S.partner,'te tocó');vib(d.n>1?[18,60,18,60,18]:14);renderFeed&&renderFeed()};
+NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');vib([40,70,40,70,40]);renderFeed&&renderFeed()};
 NET.onAlarm=d=>{ringIncoming(S.partner,false,!!d.heavy)};
 NET.onAlarmResp=d=>{
   if(d.how==='off'){S.ignored=0;save();alarmState='idle';toast(S.partner+' se despertó')}
