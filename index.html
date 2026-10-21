@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.27';
+const VERSION='beta 0.28';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -787,6 +787,7 @@ function netWire(conn){
     else if(d.type==='alarm'&&NET.onAlarm)NET.onAlarm(d);
     else if(d.type==='alarmResp'&&NET.onAlarmResp)NET.onAlarmResp(d);
     else if(d.type==='letter'&&NET.onLetter)NET.onLetter(d);
+    else if(d.type==='letterRead'){const l=S.letters.find(x=>x.id===d.id);if(l&&!l.opened){l.opened=1;save();if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}}
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
@@ -1980,7 +1981,7 @@ async function openLetter(l){
     $('#cl').onclick=closeSheet;
     if(l.kind==='audio')$('#pl').onclick=()=>l.sample?playTune():playBlob(blobs[l.k]);
   });
-  if(l.from==='p'&&!l.opened){l.opened=1;save();entangle();updateBadge()}
+  if(l.from==='p'&&!l.opened){l.opened=1;save();entangle();updateBadge();netSendSure({type:'letterRead',id:l.id})}
 }
 let actx,tuneOn=0;
 function playTune(){
