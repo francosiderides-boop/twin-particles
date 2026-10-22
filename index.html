@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.41';
+const VERSION='beta 0.42';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -2452,7 +2452,8 @@ $('#openSettings').onclick=()=>{
      <button class="btn soft full" id="ptest">Probar notificación</button></div>
    <div class="field"><span class="flabel">Cartas</span><div class="group">
      <div><span>Tu letra</span><span class="hand-prev" style="${handStyle(S.prefs.hand,S.prefs.ink)}">${S.prefs.hand?esc(HANDS[S.prefs.hand].n):'Sin elegir'}</span></div></div>
-     <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div></div>
+     <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div>
+     ${S.paired&&S.prefs.hand==='mine'?`<p class="sub">¿${esc(S.partner)} no ve tu letra a mano en tus cartas? <button class="linkbtn" id="resendHand">Reenviársela</button></p>`:''}</div>
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
      <div><span>Estado</span><b>${S.paired?'Vinculados':'Partícula solitaria'}</b></div>
      ${S.paired?`<div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div><div><span>Conexión en vivo</span><span class="sub" id="netStatusTxt">${NET.ready?'Conectada ahora':'No conectada ahora'}</span></div>`:`<div><span>Todavía no te vinculaste con tu pareja</span></div>`}</div>
@@ -2468,6 +2469,7 @@ $('#openSettings').onclick=()=>{
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
     $('#pmine').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
+    $('#resendHand')&&($('#resendHand').onclick=()=>{sendMyFont();toast(NET.ready?'Letra reenviada a '+S.partner:'Guardado · se manda sola en cuanto '+S.partner+' se conecte')});
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};

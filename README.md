@@ -2,7 +2,7 @@
 
 App para parejas, inspirada en el entrelazamiento cuántico: señales instantáneas, despertador a distancia, álbumes, listas, tareas, calendario y buzón de cartas.
 
-**Versión:** beta 0.41
+**Versión:** beta 0.42
 
 Abrí la app desde el teléfono e instalala:
 - **Android (Samsung):** Chrome → menú ⋮ → *Instalar app*.
