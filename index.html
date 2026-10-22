@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.40';
+const VERSION='beta 0.41';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -659,7 +659,15 @@ const AU={
     if(this.bus&&this.ctx){const b=this.bus,t=this.ctx.currentTime;try{b.gain.cancelScheduledValues(t);b.gain.setValueAtTime(b.gain.value,t);b.gain.linearRampToValueAtTime(0,t+.15)}catch(e){}setTimeout(()=>{try{b.disconnect()}catch(e){}},300);this.bus=null}
   }
 };
-['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{if(!AU.ctx||AU.ctx.state!=='running')AU.unlock()},{passive:true}));
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{
+  const wasBlocked=!AU.ctx||AU.ctx.state!=='running';
+  if(!wasBlocked)return;
+  AU.unlock();
+  // la pantalla de alarma se abre sola (no por un toque), así que el sonido
+  // quedó armado sobre un audio todavía bloqueado y no se escuchó nada; en
+  // cuanto haya un toque real, se vuelve a armar de cero ya desbloqueado
+  if(ringing)setTimeout(()=>{if(ringing)AU.alarmStart(ringing.heavy?'pesado':S.prefs.tone,ringing.heavy)},30);
+},{passive:true}));
 const ICON={
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   left:'<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
