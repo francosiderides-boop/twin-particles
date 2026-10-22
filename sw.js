@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.46';
+const CACHE='tp-beta-0.47';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -30,6 +30,12 @@ self.addEventListener('push',e=>{
   const title=d.title||'Twin Particles';
   const tag=d.tag||'tp';
   e.waitUntil((async()=>{
+    // los cambios que vienen adentro del aviso se guardan para que la app los aplique al abrirse
+    if(Array.isArray(d.sync)&&d.sync.length){
+      try{await new Promise(res=>{const rq=indexedDB.open('tp-inbox',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('m',{autoIncrement:true});
+        rq.onsuccess=()=>{const tx=rq.result.transaction('m','readwrite');d.sync.forEach(m=>tx.objectStore('m').add(m));tx.oncomplete=res;tx.onerror=res};rq.onerror=res})}catch(err){}
+      (await self.clients.matchAll({type:'window',includeUncontrolled:true})).forEach(c=>c.postMessage({type:'inbox'}));
+    }
     // si la app ya está abierta y a la vista, el aviso ya llegó en vivo (con su
     // propia vibración correcta); mostrar también la notificación del sistema
     // solo duplicaría vibración y sonido. La excepción es la alarma: si en ese
@@ -50,9 +56,9 @@ self.addEventListener('push',e=>{
       icon:'icon-192.png',
       badge:'icon-192.png',
       tag,
-      renotify:true,
+      renotify:tag!=='sync',
       requireInteraction:tag==='alarm',
-      silent:false, // que quede explícito: el sonido del sistema no está apagado por acá
+      silent:tag==='sync', // los cambios de listas llegan en silencio; lo demás suena
       vibrate:VIB[tag]||[60,40,60],
       timestamp:Date.now(),
       data:{url:d.url||'./'}

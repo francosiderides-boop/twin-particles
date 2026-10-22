@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.46';
+const VERSION='beta 0.47';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -820,8 +820,18 @@ function reattachBlob(msg){
   if(msg.item&&msg.item.k&&blobs[msg.item.k])msg.item.blob=blobs[msg.item.k];
   return msg;
 }
+/* cambios que viajan dentro de la notificación push: así llegan aunque los dos
+   teléfonos nunca tengan la app abierta al mismo tiempo (el iPhone la cierra enseguida) */
+let pendSync=[],pendTO=null;
+const hasBlob=m=>!!((m.letter&&m.letter.blob)||(m.photo&&m.photo.blob)||(m.item&&m.item.blob));
+function takeSync(){const out=[];let n=0;while(pendSync.length){const j=JSON.stringify(pendSync[0]);const b=new TextEncoder().encode(j).length;if(n+b>2600)break;n+=b;out.push(pendSync.shift())}return out}
 function netSendSure(msg){
+  msg.mid=msg.mid||uid();msg.ts=msg.ts||Date.now();
   netSend(msg);
+  if(!NET.ready&&S.partnerPushSub&&!hasBlob(msg)&&new TextEncoder().encode(JSON.stringify(msg)).length<2600){
+    pendSync.push(msg);clearTimeout(pendTO);
+    pendTO=setTimeout(()=>{while(pendSync.length){const sy=takeSync();if(!sy.length){pendSync.shift();continue}sendPush(S.partnerPushSub,{title:'Twin Particles',body:S.partner+' tiene novedades tuyas',tag:'sync',url:'./',sync:sy,ttl:604800})}},60);
+  }
   if(!NET.ready){
     S.outbox=S.outbox||[];
     S.outbox.push(Object.assign({t:Date.now()},stripBlob(msg)));
@@ -841,8 +851,13 @@ function netWire(conn){
   NET.conn=conn;NET.remotePeerId=conn.peer;
   if(conn.open){NET.ready=true;netOnStatus(true)}
   conn.on('open',()=>{NET.ready=true;sendVis();netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});sendMyFont();flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
-  conn.on('data',d=>{
+  conn.on('data',handleMsg);
+  conn.on('close',()=>{NET.ready=false;partnerVis=false;netOnStatus(false);netScheduleReconnect()});
+  conn.on('error',()=>{NET.ready=false;netOnStatus(false)});
+}
+function handleMsg(d){
     if(!d||!d.type)return;
+    if(d.mid){S.seen=S.seen||[];if(S.seen.includes(d.mid))return;S.seen.push(d.mid);if(S.seen.length>400)S.seen=S.seen.slice(-300);save()}
     if(d.type==='hello'&&NET.onHello)NET.onHello(d);
     else if(d.type==='signal'&&NET.onSignal)NET.onSignal(d);
     else if(d.type==='touch'&&NET.onTouch)NET.onTouch(d);
@@ -870,9 +885,6 @@ function netWire(conn){
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
     else if(d.type==='state'&&NET.onState)NET.onState(d);
-  });
-  conn.on('close',()=>{NET.ready=false;partnerVis=false;netOnStatus(false);netScheduleReconnect()});
-  conn.on('error',()=>{NET.ready=false;netOnStatus(false)});
 }
 function netOnStatus(on){
   const d=$('#netDot');if(d)d.classList.toggle('on',on);
@@ -962,6 +974,16 @@ async function ensurePush(){
     return j;
   }catch(e){return null}
 }
+function drainInbox(){
+  try{const rq=indexedDB.open('tp-inbox',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('m',{autoIncrement:true});
+    rq.onsuccess=()=>{const db=rq.result,tx=db.transaction('m','readwrite'),st=tx.objectStore('m'),g=st.getAll();
+      g.onsuccess=()=>{const items=g.result||[];if(!items.length)return;st.clear();
+        items.forEach(m=>{try{if(m.type==='alarm'||m.type==='tap'||m.type==='beatOn')return;m.late=1;handleMsg(m)}catch(e){}});
+        try{if(V[S.tab]&&!$('#main').hidden)V[S.tab]()}catch(e){}}}
+  }catch(e){}
+}
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='inbox')drainInbox()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')drainInbox()});
 /* configuración automática: la app se encarga sola de lo que pueda y, si necesita
    algo de la persona, lo pide una vez, con un solo toque */
 const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
@@ -993,7 +1015,10 @@ async function sendPush(sub,payloadObj){
   try{
     if(!sub||!sub.endpoint)return false;
     const r=await fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({subscription:sub,payload:payloadObj})});
-    return r.ok;
+    let j=null;try{j=await r.json()}catch(e){}
+    // suscripción vencida del otro lado: se olvida y su teléfono manda una nueva al reconectar
+    if(j&&(j.status===404||j.status===410)&&S.partnerPushSub&&S.partnerPushSub.endpoint===sub.endpoint){S.partnerPushSub=null;save();return false}
+    return r.ok&&(!j||j.ok!==false);
   }catch(e){return false}
 }
 let partnerVis=false;
@@ -1003,7 +1028,7 @@ function pushPartner(title,body,tag){
   // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
   // muestra notificación cuenta como falta y Safari termina cortando todas las notificaciones
   if(tag!=='alarm'&&NET.ready&&partnerVis)return;
-  if(S.partnerPushSub)sendPush(S.partnerPushSub,{title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
+  if(S.partnerPushSub)sendPush(S.partnerPushSub,{sync:takeSync(),title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
 }
 
 function applySkin(){
@@ -1249,7 +1274,7 @@ function enterApp(){
 function send(text,btn){
   text=text.trim();if(!text)return;
   S.feed.unshift({from:'m',text,t:Date.now()});S.feed=S.feed.slice(0,60);save();
-  netSend({type:'signal',text});if(!S.solo)pushPartner('Te mandó una señal',text,'signal');
+  netSendSure({type:'signal',text});if(!S.solo)pushPartner('Te mandó una señal',text,'signal');
   entangle();toast(S.solo?'Guardado en tu historial':(NET.ready?'Enviado a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora'));renderFeed();
   if(btn){btn.classList.add('sent');setTimeout(()=>btn.classList.remove('sent'),700)}
 }
@@ -1370,14 +1395,14 @@ function sendTap(){
   hint(tapN>1?tapN+' toques':'Toque enviado · el teléfono de '+S.partner+' vibra');
   clearTimeout(tapTO);tapTO=setTimeout(()=>{
     const n=tapN;tapN=0;S.feed.unshift({from:'m',text:n>1?n+' toques':'Un toque',t:Date.now()});save();renderFeed();
-    netSend({type:'touch',n});pushPartner('Te tocó','Tocá para sentirlo','touch');
+    netSendSure({type:'touch',n});pushPartner('Te tocó','Tocá para sentirlo','touch');
   },1200);
 }
 function bindTouch(){
   const cv=$('#field');if(!cv||!field)return;
   let holdTO=null,beatIv=null,holdStart=0,holding=false,downIdx=-1;
   const endHold=()=>{clearTimeout(holdTO);clearInterval(beatIv);if(field)field.hold(-1);
-    if(holding){holding=false;netSend({type:'beatOff'});const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();netSend({type:'beat',secs});pushPartner('Te mandó un latido','De '+secs+' s','beat');hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
+    if(holding){holding=false;netSend({type:'beatOff'});const secs=Math.max(1,Math.round((performance.now()-holdStart)/1000));S.feed.unshift({from:'m',text:'Latido de '+secs+' s',t:Date.now()});save();renderFeed();netSendSure({type:'beat',secs});pushPartner('Te mandó un latido','De '+secs+' s','beat');hint('Latido de '+secs+' s enviado a '+S.partner);entangle()}};
   cv.addEventListener('pointerdown',e=>{
     downIdx=field.hit(e.clientX,e.clientY);
     if(downIdx===0){field.ripple(0);vib(8);hint('Esa sos vos. Tocá a '+S.partner);return}
@@ -2544,15 +2569,15 @@ NET.onSignal=d=>receive(d.text);
 let lastTapIn=0,pBeatIv=null,pBeatTO=null,pBeatLive=0;
 const feltBack=()=>{if(document.visibilityState==='visible')netSend({type:'felt'})};
 NET.onTap=()=>{lastTapIn=Date.now();vib(70);try{field&&field.ripple(1)}catch(e){}if(typeof hint==='function')hint(S.partner+' te está tocando',1800);feltBack()};
-NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();entangle();push(S.partner,'te tocó');
-  if(Date.now()-lastTapIn>3000){const n=Math.min(d.n||1,8),p=[];for(let i=0;i<n;i++)p.push(70,110);vib(p);feltBack()}renderFeed&&renderFeed()};
+NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:d.ts||Date.now()});save();entangle();push(S.partner,'te tocó');
+  if(!d.late&&Date.now()-lastTapIn>3000){const n=Math.min(d.n||1,8),p=[];for(let i=0;i<n;i++)p.push(70,110);vib(p);feltBack()}renderFeed&&renderFeed()};
 function heartStop(){clearInterval(pBeatIv);clearTimeout(pBeatTO);pBeatIv=null;try{field&&field.hold(-1)}catch(e){}}
 NET.onBeatOn=()=>{heartStop();pBeatLive=Date.now();try{field&&field.hold(1)}catch(e){}
   const b=()=>{vib([60,120,90]);if(typeof hint==='function')hint('Sentí el latido de '+S.partner,2000)};b();pBeatIv=setInterval(b,900);pBeatTO=setTimeout(heartStop,90000);feltBack()};
 NET.onBeatOff=heartStop;
 NET.onFelt=()=>{if(typeof hint==='function')hint('A '+S.partner+' le vibró ✓',1600)};
-NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');
-  heartStop();if(Date.now()-pBeatLive>(d.secs+5)*1000){const p=[],k=Math.min(d.secs||1,20);for(let i=0;i<k;i++)p.push(60,120,90,630);vib(p);feltBack()}pBeatLive=0;renderFeed&&renderFeed()};
+NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:d.ts||Date.now()});save();entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');
+  heartStop();if(!d.late&&Date.now()-pBeatLive>(d.secs+5)*1000){const p=[],k=Math.min(d.secs||1,20);for(let i=0;i<k;i++)p.push(60,120,90,630);vib(p);feltBack()}pBeatLive=0;renderFeed&&renderFeed()};
 NET.onAlarm=d=>{if(d.t&&Date.now()-d.t>10*60*1000)return;ringIncoming(S.partner,false,!!d.heavy)};
 NET.onAlarmResp=d=>{clearInterval(alarmRepIv);alarmRepIv=null;
   if(d.how==='off'){S.ignored=0;save();alarmState='idle';toast(S.partner+' se despertó')}
@@ -2641,7 +2666,7 @@ if(S.paired||S.solo){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
-  if(S.paired)setTimeout(setupCheck,1200);
+  if(S.paired){setTimeout(setupCheck,1200);drainInbox()}
   loadBlobsFromIDB().then(()=>{if(V[S.tab]&&!$('#main').hidden)V[S.tab]()});
   // si abrió la app tocando la notificación de una alarma, que suene YA en vez
   // de esperar a que la conexión en vivo confirme el aviso (eso igual llega
