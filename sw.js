@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.33';
+const CACHE='tp-beta-0.34';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -29,16 +29,26 @@ self.addEventListener('push',e=>{
   let d={};try{d=e.data?e.data.json():{}}catch(err){}
   const title=d.title||'Twin Particles';
   const tag=d.tag||'tp';
-  e.waitUntil(self.registration.showNotification(title,{
-    body:d.body||'',
-    icon:'icon-192.png',
-    badge:'icon-192.png',
-    tag,
-    renotify:true,
-    requireInteraction:tag==='alarm',
-    vibrate:VIB[tag]||[60,40,60],
-    data:{url:d.url||'./'}
-  }));
+  e.waitUntil((async()=>{
+    // si la app ya está abierta y a la vista, el aviso ya llegó en vivo (con su
+    // propia vibración correcta); mostrar también la notificación del sistema
+    // solo duplicaría vibración y sonido. La excepción es la alarma: si en ese
+    // momento no llegó a conectarse de verdad, es la única forma de que suene.
+    if(tag!=='alarm'){
+      const cl=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+      if(cl.some(c=>c.visibilityState==='visible'))return;
+    }
+    await self.registration.showNotification(title,{
+      body:d.body||'',
+      icon:'icon-192.png',
+      badge:'icon-192.png',
+      tag,
+      renotify:true,
+      requireInteraction:tag==='alarm',
+      vibrate:VIB[tag]||[60,40,60],
+      data:{url:d.url||'./'}
+    });
+  })());
 });
 /* si el navegador rota la suscripción push sola (pasa cada tanto), hay que
    renovarla; si no, dejan de llegar avisos en 2do plano sin que nadie se
