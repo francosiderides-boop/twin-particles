@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.32';
+const VERSION='beta 0.33';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1704,9 +1704,25 @@ async function wikiSearch(q,kind){
   const okEs=d=>kind==='film'?/película|film|largometraje/i.test(d):/serie|miniserie|programa de televisión|telenovela|anime/i.test(d);
   const okEn=d=>kind==='film'?/film|movie/i.test(d):/series|miniseries|television|sitcom|anime/i.test(d);
   const [es,en]=await Promise.allSettled([jget(wikiQ('es',q+' '+word)),jget(wikiQ('en',q+' '+enWord))]);
-  const esP=es.status==='fulfilled'?wikiPages(es.value).filter(p=>okEs((p.description||'')+' '+(p.extract||'').slice(0,160))):[];
+  let esP=es.status==='fulfilled'?wikiPages(es.value).filter(p=>okEs((p.description||'')+' '+(p.extract||'').slice(0,160))):[];
   const enP=en.status==='fulfilled'?wikiPages(en.value).filter(p=>okEn((p.description||'')+' '+(p.extract||'').slice(0,160))):[];
   if(es.status==='rejected'&&en.status==='rejected')throw new Error('sin conexión');
+  // la búsqueda de texto en español casi nunca encuentra el artículo correcto
+  // por casualidad ("El origen" no contiene la palabra "Inception"), así que
+  // para los que ya encontramos en inglés pero no en español, buscamos su
+  // traducción real a través de Wikidata (el enlace oficial entre idiomas)
+  const esIds=new Set(esP.map(p=>p.pageprops&&p.pageprops.wikibase_item).filter(Boolean));
+  const need=[...new Set(enP.map(p=>p.pageprops&&p.pageprops.wikibase_item).filter(id=>id&&!esIds.has(id)))].slice(0,20);
+  if(need.length){
+    try{
+      const wd=await jget1('https://www.wikidata.org/w/api.php?action=wbgetentities&ids='+need.join('|')+'&props=sitelinks&sitefilter=eswiki&format=json&origin=*',6000);
+      const titles=need.map(id=>{const e=wd.entities&&wd.entities[id];return e&&e.sitelinks&&e.sitelinks.eswiki&&e.sitelinks.eswiki.title}).filter(Boolean);
+      if(titles.length){
+        const j2=await jget1('https://es.wikipedia.org/w/api.php?action=query&format=json&origin=*&titles='+encodeURIComponent(titles.join('|'))+'&prop=pageimages|description|pageprops|extracts&exintro=1&explaintext=1&exsentences=3&piprop=thumbnail&pithumbsize=400&ppprop=wikibase_item',6000);
+        esP=esP.concat(Object.values((j2&&j2.query&&j2.query.pages)||{}).filter(p=>!p.missing));
+      }
+    }catch(e){}
+  }
   const byQ={};enP.forEach(p=>{const id=p.pageprops&&p.pageprops.wikibase_item;if(id)byQ[id]=p});
   const out=[],seen=new Set();
   const push=(p,lang)=>{const id=p.pageprops&&p.pageprops.wikibase_item;if(id&&seen.has(id))return;id&&seen.add(id);
