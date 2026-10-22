@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.34';
+const VERSION='beta 0.35';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -731,6 +731,34 @@ function setBlob(k,data){
 function delBlob(k){
   delete blobs[k];
   idbOpen().then(db=>{try{db.transaction('b','readwrite').objectStore('b').delete(k)}catch(e){}}).catch(()=>{});
+}
+// las fotos de la cámara pueden pesar varios MB; sin achicarlas, mandarlas
+// por el canal directo es lento y en algunos teléfonos directamente falla
+// (hay un límite de tamaño por mensaje). Las bajamos a un tamaño razonable
+// antes de guardarlas y mandarlas — también hace que la app ande más rápido.
+function compressImage(file,maxDim=1600,quality=0.82){
+  return new Promise(res=>{
+    if(!file||!file.type||!file.type.startsWith('image/'))return res(null);
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxDim||h>maxDim){const r=Math.min(maxDim/w,maxDim/h);w=Math.round(w*r);h=Math.round(h*r)}
+      try{
+        const c=document.createElement('canvas');c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg',quality));
+      }catch(e){URL.revokeObjectURL(url);res(null)}
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);res(null)};
+    img.src=url;
+  });
+}
+// como antes, pero cae a leer el archivo tal cual si no se pudo comprimir
+// (no es una foto, o algo falló)
+function readPhoto(file){
+  return compressImage(file).then(d=>d||new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)}));
 }
 function loadBlobsFromIDB(){
   return idbOpen().then(db=>new Promise(res=>{
@@ -1447,7 +1475,7 @@ function albumView(a){
   document.querySelectorAll('.ph').forEach(b=>b.onclick=()=>{$('#layer').innerHTML=`<div class="lightbox" id="lb"><img src="${photoSrc(a.photos[b.dataset.i])}" alt="Foto ${+b.dataset.i+1} del álbum ${esc(a.name)}"></div>`;$('#lb').onclick=()=>$('#layer').innerHTML=''});
   $('#bk').onclick=()=>{openAlbum=null;V.albumes()};
   $('#delA').onclick=()=>sheet(`<h2>¿Borrar “${esc(a.name)}”?</h2><p class="sub">Se borra para los dos, con todas sus fotos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.albums=S.albums.filter(x=>x!==a);save();netSendSure({type:'albumdel',id:a.id});openAlbum=null;closeSheet();V.albumes();toast('Álbum borrado')}});
-  $('#up').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;let n=0;fs.forEach(f=>{const r=new FileReader();r.onload=()=>{const k=uid();setBlob(k,r.result);a.photos.unshift({k});netSendSure({type:'photoadd',albumId:a.id,albumName:a.name,albumDate:a.date,photo:{k,blob:r.result}});if(++n===fs.length){save();albumView(a);entangle();toast(fs.length+(fs.length>1?' fotos agregadas':' foto agregada'))}};r.readAsDataURL(f)})};
+  $('#up').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;let n=0;fs.forEach(f=>{readPhoto(f).then(data=>{const k=uid();setBlob(k,data);a.photos.unshift({k});netSendSure({type:'photoadd',albumId:a.id,albumName:a.name,albumDate:a.date,photo:{k,blob:data}});if(++n===fs.length){save();albumView(a);entangle();toast(fs.length+(fs.length>1?' fotos agregadas':' foto agregada'))}})})};
 }
 
 /* listas */
@@ -1891,7 +1919,7 @@ function bindManual(L,items){
     if(link)Object.assign(it,{url:link.url,src:link.src,host:link.host});
     if(auto&&auto.img)it.img=auto.img;
     const done=()=>{items.unshift(it);save();const payload=Object.assign({},it);if(it.k&&blobs[it.k])payload.blob=blobs[it.k];netSendSure({type:'listadd',listId:L.id,item:payload});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
-    if(file){const r=new FileReader();r.onload=()=>{const k=uid();setBlob(k,r.result);it.k=k;done()};r.readAsDataURL(file)}else done();
+    if(file){readPhoto(file).then(data=>{const k=uid();setBlob(k,data);it.k=k;done()})}else done();
   };
 }
 
@@ -2071,7 +2099,7 @@ function compose(kind0){
         toast(NET.ready?'Carta enviada a '+S.partner:'Guardado · '+S.partner+' no está conectado ahora, no le llegó todavía')};
       if(kind==='text'){const tx=ta.value.trim();if(!tx){$('#lerr').textContent='La carta está vacía.';return ta.focus()}return done({text:tx,hand:S.prefs.hand,ink:S.prefs.ink})}
       if(!file)return $('#lerr').textContent=kind==='photo'?'Falta la foto de la carta.':'Falta el audio.';
-      const r=new FileReader();r.onload=()=>{const k=uid();setBlob(k,r.result);done({k})};r.readAsDataURL(file)};
+      readPhoto(file).then(data=>{const k=uid();setBlob(k,data);done({k})})};
   });
 }
 
