@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.47';
+const VERSION='beta 0.48';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1478,7 +1478,7 @@ function renderAlarm(){
     $('#stopA').onclick=()=>{clearTimeout(alarmTO);alarmState='idle';renderAlarm();toast('Alarma detenida')};
   }else if(alarmState==='sent'){
     const hv=S.lastAlarm&&S.lastAlarm.heavy;
-    el.innerHTML=`<div class="ringing ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado enviado':'Alarma enviada'} a ${esc(S.partner)}</b><div class="sub">${hhmm(S.lastAlarm.t)}</div></div></div>
+    el.innerHTML=`<div class="ringing ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado enviado':'Alarma enviada'} a ${esc(S.partner)}</b><div class="sub">${hhmm(S.lastAlarm.t)}${alarmRepIv?' · le vuelve a sonar cada 6 s hasta que conteste (dejá esta pantalla abierta)':''}</div></div></div>
       <div class="row"><button class="btn soft" id="markIgn" style="flex:1">No se despertó</button><button class="btn" id="resetA" style="flex:1">Se despertó</button></div>`;
     $('#resetA').onclick=()=>{S.ignored=0;save();alarmState='idle';renderAlarm();toast('Contador de alarmas reiniciado')};
     $('#markIgn').onclick=()=>{S.ignored=Math.min(HEAVY_AT,(S.ignored||0)+1);save();alarmState='ignored';renderAlarm();if(S.ignored===HEAVY_AT){vib([40,40,40]);toast('Sueño pesado desbloqueado')}};
@@ -1497,18 +1497,22 @@ function renderAlarm(){
 function fire(heavy){
   alarmState='sent';S.lastAlarm={heavy:!!heavy,t:Date.now()};save();entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
   S.feed.unshift({from:'m',text:heavy?'Alarma de sueño pesado':'Alarma para despertar',t:Date.now()});save();renderFeed();
-  netSendSure({type:'alarm',heavy:!!heavy,t:Date.now()});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Tocá para apagarla','alarm');alarmRepeat(heavy);
+  netSendSure({type:'alarm',heavy:!!heavy,t:Date.now()});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Tocá para apagarla','alarm');alarmRepeat(heavy);renderAlarm();
   if(!NET.ready)toast(S.partnerPushSub?'Le suena como notificación y se repite hasta que conteste':'Guardado · '+S.partner+' no tiene las notificaciones activadas, no va a sonarle con la app cerrada');
 }
 
 /* mientras no conteste, la alarma vuelve a sonar en su teléfono cada 8 s (hasta 2 min):
    una sola notificación suena una vez y es fácil no escucharla dormido */
 let alarmRepIv=null;
-function alarmRepeat(heavy){clearInterval(alarmRepIv);let n=0;alarmRepIv=setInterval(()=>{
-  if(alarmState!=='sent'||++n>15){clearInterval(alarmRepIv);alarmRepIv=null;return}
+let repLock=null;
+function alarmRepeat(heavy){clearInterval(alarmRepIv);let n=0;
+  // pantalla encendida mientras insiste: con el teléfono bloqueado el navegador frena los relojes
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>repLock=l,()=>{})}catch(e){}
+  alarmRepIv=setInterval(()=>{
+  if(alarmState!=='sent'||++n>30){clearInterval(alarmRepIv);alarmRepIv=null;try{repLock&&repLock.release()}catch(e){}repLock=null;return}
   pushPartner((heavy?'Necesita que te despiertes YA':'Te está despertando')+' ('+(n+1)+')','Tocá para apagarla','alarm');
   if(NET.ready)netSend({type:'alarm',heavy:!!heavy,t:Date.now()});
-},8000)}
+},6000)}
 /* pantalla de alarma entrante */
 let ringing=null,wakeLock=null,clockIv=null;
 function ringIncoming(from,test,heavy){
@@ -2579,7 +2583,7 @@ NET.onFelt=()=>{if(typeof hint==='function')hint('A '+S.partner+' le vibró ✓'
 NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:d.ts||Date.now()});save();entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');
   heartStop();if(!d.late&&Date.now()-pBeatLive>(d.secs+5)*1000){const p=[],k=Math.min(d.secs||1,20);for(let i=0;i<k;i++)p.push(60,120,90,630);vib(p);feltBack()}pBeatLive=0;renderFeed&&renderFeed()};
 NET.onAlarm=d=>{if(d.t&&Date.now()-d.t>10*60*1000)return;ringIncoming(S.partner,false,!!d.heavy)};
-NET.onAlarmResp=d=>{clearInterval(alarmRepIv);alarmRepIv=null;
+NET.onAlarmResp=d=>{clearInterval(alarmRepIv);alarmRepIv=null;try{repLock&&repLock.release()}catch(e){}repLock=null;
   if(d.how==='off'){S.ignored=0;save();alarmState='idle';toast(S.partner+' se despertó')}
   else{toast(S.partner+' pidió 5 minutos más')}
   if($('#alarm'))renderAlarm();
