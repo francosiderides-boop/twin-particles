@@ -573,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.51';
+const VERSION='beta 0.52';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -755,7 +755,7 @@ function delBlob(k){
 // por el canal directo es lento y en algunos teléfonos directamente falla
 // (hay un límite de tamaño por mensaje). Las bajamos a un tamaño razonable
 // antes de guardarlas y mandarlas — también hace que la app ande más rápido.
-function compressImage(file,maxDim=1600,quality=0.82){
+function compressImage(file,maxDim=1280,quality=0.78){ // chica para que entre en un documento de la base
   return new Promise(res=>{
     if(!file||!file.type||!file.type.startsWith('image/'))return res(null);
     const url=URL.createObjectURL(file);
@@ -800,7 +800,62 @@ function loadPeerJS(){
   if(NET._loading)return NET._loading;
   return NET._loading=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';s.onload=res;s.onerror=()=>rej(new Error('No se pudo cargar la conexión. Revisá internet.'));document.head.appendChild(s)});
 }
-function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}}
+/* ===== Firebase: un servidor siempre prendido en el medio =====
+   Ya vinculados, los teléfonos no se hablan directo: cada uno escribe en Firestore y
+   escucha lo que escribe el otro. Firestore guarda todo hasta que el otro lo lea (aunque
+   tenga la app cerrada días), funciona sin internet y sincroniza solo al volver.
+   PeerJS queda solo para el momento de vincularse. */
+const FBCFG={apiKey:'AIzaSyD6YidJ5nqT7ISRy0CwVOZQLeMfg3NYRgE',authDomain:'twin-particles.firebaseapp.com',projectId:'twin-particles',storageBucket:'twin-particles.firebasestorage.app',messagingSenderId:'470911575928',appId:'1:470911575928:web:e25a920cd746db90b98a8d'};
+const FB={db:null,uid:null,ref:null,ready:false,q:[],started:0,err:null};
+const coupleId=()=>(S.myPeerId&&S.partnerPeerId)?[S.myPeerId,S.partnerPeerId].sort().join('__').replace(/[\/.]/g,'_'):null;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('sin conexión'));document.head.appendChild(s)})}
+async function fbStart(){
+  if(FB.started||!S.paired)return;const cid=coupleId();if(!cid)return;FB.started=1;
+  try{
+    const B='https://www.gstatic.com/firebasejs/10.14.1/';
+    if(!window.firebase){await loadScript(B+'firebase-app-compat.js');await Promise.all([loadScript(B+'firebase-auth-compat.js'),loadScript(B+'firebase-firestore-compat.js')])}
+    if(!firebase.apps.length){firebase.initializeApp(FBCFG);try{await firebase.firestore().enablePersistence({synchronizeTabs:true})}catch(e){}}
+    const auth=firebase.auth();
+    let user=await new Promise(r=>{const u=auth.onAuthStateChanged(x=>{u();r(x)})});
+    if(!user)user=(await auth.signInAnonymously()).user;
+    FB.uid=user.uid;FB.db=firebase.firestore();FB.ref=FB.db.collection('couples').doc(cid);
+    const FV=firebase.firestore.FieldValue;
+    // una sola escritura sirve para crear la pareja o sumarse (las reglas no dejan entrar a un tercero)
+    await FB.ref.set({members:FV.arrayUnion(FB.uid)},{merge:true});
+    FB.ready=true;NET.ready=true;FB.err=null;netOnStatus(true);
+    FB.q.splice(0).forEach(fbWrite);flushOutbox();
+    if(!S.fontSent&&S.prefs.hand==='mine'){sendMyFont();S.fontSent=1;save()}
+    FB.ref.onSnapshot(snap=>{
+      const d=snap.data()||{},subs=d.subs||{},vis=d.vis||{},p=(d.members||[]).find(x=>x!==FB.uid);
+      if(p&&subs[p]&&(!S.partnerPushSub||S.partnerPushSub.endpoint!==subs[p].endpoint)){S.partnerPushSub=subs[p];save()}
+      partnerVis=!!(p&&vis[p]&&vis[p].v&&Date.now()-vis[p].t<90000);
+      if(S.myPushSub&&(!subs[FB.uid]||subs[FB.uid].endpoint!==S.myPushSub.endpoint))fbSub(S.myPushSub);
+    },e=>{FB.err=String(e.code||e)});
+    FB.ref.collection('msgs').orderBy('t').onSnapshot(snap=>{
+      snap.docChanges().forEach(ch=>{
+        if(ch.type!=='added')return;const m=ch.doc.data();if(!m||m.from===FB.uid)return;
+        const d=m.d||{};if(d.ts&&Date.now()-d.ts>20000)d.late=1;
+        try{handleMsg(d)}catch(e){}
+        ch.doc.ref.delete().catch(()=>{});
+      });
+    },e=>{FB.err=String(e.code||e)});
+    fbVis();
+  }catch(e){FB.started=0;FB.err=String(e&&(e.code||e.message)||e);setTimeout(fbStart,15000)}
+}
+function fbWrite(msg){
+  if(!FB.ready){FB.q.push(msg);fbStart();return}
+  msg.ts=msg.ts||Date.now();
+  FB.ref.collection('msgs').add({from:FB.uid,t:firebase.firestore.FieldValue.serverTimestamp(),d:msg}).catch(e=>{FB.err=String(e.code||e)});
+}
+function fbSub(sub){if(FB.ready&&sub)FB.ref.update({['subs.'+FB.uid]:sub}).catch(()=>{})}
+function fbVis(){if(FB.ready)FB.ref.update({['vis.'+FB.uid]:{v:document.visibilityState==='visible',t:Date.now()}}).catch(()=>{})}
+setInterval(()=>{if(document.visibilityState==='visible')fbVis()},60000);
+function netSend(msg){
+  if(S.paired&&coupleId()&&FB.ready){fbWrite(msg);return}
+  // mientras Firebase no responde, la conexión directa queda de respaldo
+  let sent=false;try{if(NET.conn&&NET.conn.open){NET.conn.send(msg);sent=true}}catch(e){}
+  if(!sent&&S.paired&&coupleId())fbWrite(msg);
+}
 // para avisos que tienen que llegar sí o sí (cartas, eventos, listas, alarma):
 // si al mandarlos no hay conexión en vivo, se guardan y se reintentan solos
 // apenas vuelva a conectar (al abrir la app, al reconectar, etc).
@@ -924,6 +979,7 @@ async function netJoin(code,cb){
 }
 function netConnectToPartner(){
   if(!S.paired||!S.partnerPeerId||!S.myPeerId)return;
+  fbStart();if(FB.ready)return; // ya vinculados: todo pasa por Firebase; si no responde, conexión directa
   if(NET.ready)return; // ya hay una conexión de verdad, no hace falta nada
   loadPeerJS().then(()=>{
     if(NET.peer&&!NET.peer.destroyed){
@@ -972,7 +1028,7 @@ async function ensurePush(){
     const reg=await navigator.serviceWorker.ready;
     let sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBuf(VAPID_PUB)});
-    const j=sub.toJSON();S.myPushSub=j;save();
+    const j=sub.toJSON();S.myPushSub=j;save();fbSub(j);
     if(NET.ready)netSend({type:'pushsub',sub:j});
     return j;
   }catch(e){S.lastPushErr=String(e);return null}
@@ -1021,6 +1077,7 @@ async function pushDiag(){
   const L=(good,t)=>`<li style="margin:6px 0">${good?'✅':'⚠️'} ${t}</li>`;
   const perm='Notification' in window?Notification.permission:'none';
   sheet(`<h2>Avisos</h2><ul class="sub" style="list-style:none;padding:0;margin:0 0 12px">
+    ${L(FB.ready,FB.ready?'Conectado al servidor de Twin Particles':'Sin conexión al servidor'+(FB.err?' ('+esc(FB.err)+')':''))}
     ${L(!isIOS||isApp(),isIOS&&!isApp()?'Está abierta desde Safari: en iPhone tiene que abrirse desde el ícono de la pantalla de inicio':'App instalada')}
     ${L(perm==='granted',perm==='granted'?'Permiso de notificaciones activado':perm==='denied'?'Notificaciones bloqueadas para esta app':'Todavía no diste permiso')}
     ${L(!!ok,ok?'Este teléfono está listo para recibir avisos':'Este teléfono no puede recibir avisos todavía'+(S.lastPushErr?' ('+esc(S.lastPushErr)+')':''))}
@@ -1042,7 +1099,7 @@ async function sendPush(sub,payloadObj){
   }catch(e){return false}
 }
 let partnerVis=false;
-function sendVis(){netSend({type:'vis',v:document.visibilityState==='visible'})}
+function sendVis(){fbVis()}
 document.addEventListener('visibilitychange',sendVis);
 function pushPartner(title,body,tag){
   // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
@@ -1273,6 +1330,7 @@ function bond(){
     S.myPeerId=ob.myId||NET.id||null;
     S.partnerPeerId=ob.mode==='create'?NET.remotePeerId:('tp9-'+ob.code);
     S.paired=true;S.solo=false;S.pairedAt=TODAYS;save();
+    setTimeout(fbStart,300);
     P.innerHTML=`<div class="ob-panel bonded-msg">
       <span class="label">Correlación 1.00</span>
       <h1>Vos y ${esc(S.partner)}<br>ahora son Twin Particles</h1>
