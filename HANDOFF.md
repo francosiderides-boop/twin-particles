@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.51
+**Versión actual:** beta 0.52
 
 ## Para arrancar en una sesión nueva (otra cuenta o chat)
 1. Darle acceso al repo `francosiderides-boop/twin-particles` y pedir: "Leé HANDOFF.md y seguí desde ahí".
@@ -13,6 +13,14 @@
    - actualizar la línea `**Versión:**` del README;
    - `git commit` + `git push` a `main`. En 1–2 minutos está en la URL.
    - Revisar sintaxis antes: extraer el `<script>` y correr `node --check`.
+
+## Firebase (desde beta 0.52)
+- Proyecto `twin-particles` (plan Spark), Firestore en `southamerica-east1`, Auth anónima (sin borrado automático).
+- Ya vinculados, todo viaja por Firestore: `couples/{idA__idB}` (ids de PeerJS ordenados) con `members` (uids), `subs.{uid}` (dirección de avisos) y `vis.{uid}`; mensajes en `couples/{id}/msgs` (`from`, `t`, `d` = el mensaje de siempre). El que recibe lo aplica con `handleMsg` y lo borra. Código: `fbStart`, `fbWrite`, `fbSub`, `fbVis`.
+- Reglas en `firestore.rules` (publicadas desde la consola): solo los 2 miembros leen/escriben; un tercero no puede sumarse.
+- PeerJS solo para vincularse y como respaldo si Firebase no responde.
+- Fotos: comprimidas (1280 px) viajan dentro del mensaje (límite 1 MB por documento).
+- Pendiente (requiere plan Blaze): Cloud Functions que manden los push y repitan la alarma desde el servidor; Storage para fotos/audios grandes. Se puede desplegar desde Cloud Shell en la consola de Firebase.
 
 ## Arquitectura
 - **Conexión en vivo:** PeerJS (WebRTC) entre los dos teléfonos (`netConnectToPartner`, `netWire`, `handleMsg`). Reconexión automática al volver a la app / online / cada 15 s.
