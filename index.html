@@ -573,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.49';
+const VERSION='beta 0.50';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1731,20 +1731,18 @@ function taskForm(L,items,x,idx){
 function eventForm(ev){
   const ed=!!ev;ev=ev||{d:selD,tm:'',t:'',who:'ambos'};
   let w=ev.who||'ambos',[hh,mi]=(ev.tm||'').split(':');hh=hh||'';mi=mi||'00';
-  const quick=[['','Todo el día'],['09','9:00'],['13','13:00'],['18','18:00'],['21','21:00']];
-  const hOpts=['<option value="">—</option>'].concat(Array.from({length:24},(_,i)=>{const v=String(i).padStart(2,'0');return `<option value="${v}">${v}</option>`})).join('');
+  const hOpts=['<option value="">Todo el día</option>'].concat(Array.from({length:24},(_,i)=>{const v=String(i).padStart(2,'0');return `<option value="${v}">${v}</option>`})).join('');
   const mOpts=Array.from({length:12},(_,i)=>{const v=String(i*5).padStart(2,'0');return `<option value="${v}">${v}</option>`}).join('');
   sheet(`<h2>${ed?'Editar evento':'Nuevo evento'}</h2>
     <div class="field"><label for="et">Qué</label><input class="input" id="et" maxlength="60" placeholder="Ej: Cine a la noche" value="${esc(ev.t)}"></div>
     <div class="field"><label for="ed">Día</label><input class="input" type="date" id="ed" value="${ev.d}"></div>
-    <div class="field"><span class="flabel">Hora</span><div class="chips" id="eq">${quick.map(([v,n])=>`<button class="chip" data-h="${v}">${n}</button>`).join('')}</div>
-      <div class="row" style="align-items:center;gap:8px"><select class="input" id="eh" aria-label="Hora">${hOpts}</select><b style="font-size:20px">:</b><select class="input" id="em" aria-label="Minutos">${mOpts}</select></div></div>
+    <div class="field"><span class="flabel">Hora</span><div class="row" style="align-items:center;gap:8px"><select class="input" id="eh" aria-label="Hora">${hOpts}</select><b style="font-size:20px">:</b><select class="input" id="em" aria-label="Minutos">${mOpts}</select></div></div>
     <div class="field"><span class="flabel">De quién</span><div class="seg" id="ew" style="grid-template-columns:1fr 1fr 1fr">${[['ambos','Los dos'],['m',meName()],['p',S.partner]].map(([k,n])=>`<button data-w="${k}" class="${w===k?'on':''}">${esc(n)}</button>`).join('')}</div></div>
     <div class="row">${ed?'<button class="btn danger" id="eDel">Borrar</button>':''}<button class="btn" id="eOk" style="flex:1">${ed?'Guardar':'Guardar evento'}</button></div>`,()=>{
       const H=$('#eh'),M=$('#em');H.value=hh;M.value=(Math.round(+mi/5)*5%60+'').padStart(2,'0');
-      const paint=()=>{M.disabled=!H.value;M.style.opacity=H.value?1:.4;document.querySelectorAll('#eq [data-h]').forEach(b=>b.classList.toggle('on',b.dataset.h===H.value&&(!H.value||M.value==='00')))};
+      const paint=()=>{M.disabled=!H.value;M.style.opacity=H.value?1:.4};
       H.onchange=paint;M.onchange=paint;
-      document.querySelectorAll('#eq [data-h]').forEach(b=>b.onclick=()=>{H.value=b.dataset.h;M.value='00';paint()});paint();
+      paint();
       document.querySelectorAll('#ew button').forEach(b=>b.onclick=()=>{w=b.dataset.w;document.querySelectorAll('#ew button').forEach(x=>x.classList.toggle('on',x===b))});
       if(!ed)$('#et').focus();
       $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return $('#ed').focus();
