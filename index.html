@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.35';
+const VERSION='beta 0.36';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -785,11 +785,30 @@ function netSend(msg){try{NET.conn&&NET.conn.open&&NET.conn.send(msg)}catch(e){}
 // para avisos que tienen que llegar sí o sí (cartas, eventos, listas, alarma):
 // si al mandarlos no hay conexión en vivo, se guardan y se reintentan solos
 // apenas vuelva a conectar (al abrir la app, al reconectar, etc).
+// las fotos (base64) no se guardan dentro de la cola: esa cola es parte del
+// mismo estado que se reescribe entero en localStorage cada vez que se guarda
+// cualquier cosa en la app (marcar una tarea, etc.) — si llevara fotos adentro,
+// cada guardado chiquito se volvería lentísimo y hasta podría llenar el
+// espacio disponible. La foto ya está a salvo en IndexedDB; al reintentar se
+// vuelve a pegar desde ahí.
+function stripBlob(msg){
+  const m=Object.assign({},msg);
+  if(m.letter){m.letter=Object.assign({},m.letter);delete m.letter.blob}
+  if(m.photo){m.photo=Object.assign({},m.photo);delete m.photo.blob}
+  if(m.item){m.item=Object.assign({},m.item);delete m.item.blob}
+  return m;
+}
+function reattachBlob(msg){
+  if(msg.letter&&msg.letter.k&&blobs[msg.letter.k])msg.letter.blob=blobs[msg.letter.k];
+  if(msg.photo&&msg.photo.k&&blobs[msg.photo.k])msg.photo.blob=blobs[msg.photo.k];
+  if(msg.item&&msg.item.k&&blobs[msg.item.k])msg.item.blob=blobs[msg.item.k];
+  return msg;
+}
 function netSendSure(msg){
   netSend(msg);
   if(!NET.ready){
     S.outbox=S.outbox||[];
-    S.outbox.push(Object.assign({t:Date.now()},msg));
+    S.outbox.push(Object.assign({t:Date.now()},stripBlob(msg)));
     // si nunca se reconecta (se desvincularon, desinstaló, etc) esto no
     // puede crecer para siempre: se guarda como mucho 1 mes y 300 avisos
     const cut=Date.now()-30*24*3600*1000;
@@ -799,7 +818,7 @@ function netSendSure(msg){
 }
 function flushOutbox(){
   if(!NET.ready||!S.outbox||!S.outbox.length)return;
-  const items=S.outbox;S.outbox=[];save();
+  const items=S.outbox.map(reattachBlob);S.outbox=[];save();
   items.forEach(m=>netSend(m));
 }
 function netWire(conn){
