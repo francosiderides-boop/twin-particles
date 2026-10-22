@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.45';
+const VERSION='beta 0.46';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -962,6 +962,31 @@ async function ensurePush(){
     return j;
   }catch(e){return null}
 }
+/* configuración automática: la app se encarga sola de lo que pueda y, si necesita
+   algo de la persona, lo pide una vez, con un solo toque */
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+const isApp=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+let instEv=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();instEv=e});
+async function setupCheck(fromTap){
+  if(!S.paired)return;
+  if(isIOS&&!isApp()){ // en iPhone, sin estar en la pantalla de inicio no hay avisos con la app cerrada
+    if(S.instAsk===TODAYS&&!fromTap)return;S.instAsk=TODAYS;save();
+    sheet(`<h2>Un último paso</h2><p class="sub">Para que te suenen las alarmas y sientas a ${esc(S.partner)} aunque la app esté cerrada, sumala a tu pantalla de inicio. Es una sola vez.</p>
+    <ol class="sub" style="line-height:1.9;padding-left:20px;margin:6px 0 14px"><li>Tocá <b>Compartir</b> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8"/></svg> en la barra de Safari</li><li>Elegí <b>Agregar a inicio</b></li><li>Abrí Twin Particles desde el ícono nuevo</li></ol>
+    <button class="btn full" id="instOk">Entendido</button>`,()=>$('#instOk').onclick=closeSheet);
+    return;
+  }
+  if(!('Notification' in window)||!('PushManager' in window))return;
+  if(Notification.permission==='granted'){ensurePush();return}
+  if(Notification.permission==='denied')return;
+  if(fromTap){ensurePush();return}
+  sheet(`<h2>Que te suene aunque esté cerrada</h2><p class="sub">Así te llegan las alarmas, toques, latidos y cartas de ${esc(S.partner)} sin tener la app abierta.</p>
+  ${instEv?'<p class="sub">También podés instalarla para abrirla como una app más.</p>':''}
+  <div class="row"><button class="btn soft full" id="pLater">Ahora no</button><button class="btn full" id="pOk">Activar</button></div>`,()=>{
+    $('#pLater').onclick=closeSheet;
+    $('#pOk').onclick=async()=>{closeSheet();const ok=await ensurePush();if(instEv){try{instEv.prompt()}catch(e){}instEv=null}toast(ok?'Listo, quedó activado':'No se pudo activar')};
+  });
+}
 async function sendPush(sub,payloadObj){
   // el navegador ya no puede mandarle el push directo al servicio (FCM/Mozilla/Apple
   // bloquean eso por CORS desde 2022), así que un relay chiquito hace esa parte.
@@ -1207,8 +1232,8 @@ function bond(){
       <p class="lead" style="text-align:center">Lo que le pase a uno, el otro lo va a sentir.</p>
       <button class="btn lg full" id="obEnter" style="margin-top:8px">Entrar</button></div>`;
     $('#obTop').style.opacity='1';
-    $('#obEnter').onclick=enterApp;
-    ensurePush();
+    // el pedido de permiso tiene que salir de un toque (iPhone lo ignora si no)
+    $('#obEnter').onclick=()=>{enterApp();setupCheck(true)};
   });
 }
 function enterApp(){
@@ -2616,7 +2641,7 @@ if(S.paired||S.solo){
   const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
   enterApp();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
-  if(S.paired)ensurePush();
+  if(S.paired)setTimeout(setupCheck,1200);
   loadBlobsFromIDB().then(()=>{if(V[S.tab]&&!$('#main').hidden)V[S.tab]()});
   // si abrió la app tocando la notificación de una alarma, que suene YA en vez
   // de esperar a que la conexión en vivo confirme el aviso (eso igual llega
