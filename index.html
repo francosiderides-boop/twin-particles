@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.37';
+const VERSION='beta 0.38';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -928,10 +928,10 @@ const b64uToBuf=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+=
 const bufToB64u=b=>{let s='';const a=new Uint8Array(b);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')};
 async function ensurePush(){
   try{
-    if(!('serviceWorker' in navigator)||!('PushManager' in window)){S.pushBlocked=1;save();return null}
+    if(!('serviceWorker' in navigator)||!('PushManager' in window)){S.pushBlocked=1;S.pushReason='unsupported';save();return null}
     const perm=await Notification.requestPermission();
-    if(perm!=='granted'){S.pushBlocked=1;save();return null}
-    if(S.pushBlocked){S.pushBlocked=0;save()}
+    if(perm!=='granted'){S.pushBlocked=1;S.pushReason='denied';save();return null}
+    if(S.pushBlocked){S.pushBlocked=0;S.pushReason=null;save()}
     const reg=await navigator.serviceWorker.ready;
     let sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBuf(VAPID_PUB)});
@@ -2419,7 +2419,7 @@ $('#openSettings').onclick=()=>{
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
      <div><span>Estado</span><b>${S.paired?'Vinculados':'Partícula solitaria'}</b></div>
      ${S.paired?`<div><span>Entrelazados desde</span><b>${S.pairedAt?fmtLong(S.pairedAt):'—'}</b></div><div><span>Conexión en vivo</span><span class="sub" id="netStatusTxt">${NET.ready?'Conectada ahora':'No conectada ahora'}</span></div>`:`<div><span>Todavía no te vinculaste con tu pareja</span></div>`}</div>
-     ${S.paired&&S.pushBlocked?`<p class="sub" style="color:var(--danger,#d4453a)">Las notificaciones están bloqueadas en este teléfono: mientras la app esté cerrada no vas a recibir cartas, alarmas ni avisos. <button class="linkbtn" id="pushRetry">Activarlas</button></p>`:''}
+     ${S.paired&&S.pushBlocked?(S.pushReason==='unsupported'?`<p class="sub" style="color:var(--danger,#d4453a)">Para recibir cartas, alarmas y avisos con la app cerrada en este teléfono hay que instalarla: en iPhone, tocá Compartir y "Agregar a inicio"; en Android, el menú del navegador y "Instalar app".</p>`:`<p class="sub" style="color:var(--danger,#d4453a)">Las notificaciones están bloqueadas en este teléfono: mientras la app esté cerrada no vas a recibir cartas, alarmas ni avisos. <button class="linkbtn" id="pushRetry">Activarlas</button></p>`):''}
      ${S.paired?'<button class="btn danger full" id="unpair">Desvincular teléfonos</button>':'<button class="btn full" id="pairNow">Vincularme con mi pareja</button>'}</div>
    <div class="row"><button class="btn soft full" id="reset">Borrar todo</button><button class="btn full" id="sOk">Listo</button></div>
    <div class="ver">Twin Particles · ${VERSION}</div>`,()=>{
