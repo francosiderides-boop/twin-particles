@@ -291,6 +291,9 @@ input.code::placeholder{color:var(--line)}
 .hero{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;border-radius:16px;background-color:var(--surface2);background-size:cover;background-position:center;flex:none}
 .hero.poster{width:170px;aspect-ratio:2/3;margin:0 auto;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .hero.square{width:200px;aspect-ratio:1;margin:0 auto}
+input.input[type=date],input.input[type=time],select.input{-webkit-appearance:none;appearance:none;min-height:48px;line-height:1.2;text-align:left;font:inherit;color:var(--ink,inherit)}
+select.input{text-align-last:center;font-size:18px;font-variant-numeric:tabular-nums}
+input.input::-webkit-date-and-time-value{text-align:left}
 textarea.input{resize:vertical;min-height:76px;line-height:1.45}
 a.btn{text-decoration:none}
 
@@ -570,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.48';
+const VERSION='beta 0.49';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1720,7 +1723,36 @@ function taskForm(L,items,x,idx){
       save();closeSheet();V.listas();
       if(!editing){entangle();toast(who==='p'?'Tarea asignada a '+S.partner:'Tarea agregada');if(who!=='m')setTimeout(()=>{},0)}
     };
-    if(editing)$('#tDel').onclick=()=>{const [gone]=items.splice(idx,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Tarea borrada','Deshacer',()=>{items.splice(idx,0,gone);save();V.listas()})};
+    if(editing)$('#tDel').onclick=()=>{const [gone]=items.splice(idx,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Tarea borrada','Deshacer',()=>{items.splice(idx,0,gone);save();if(gone.id)netSendSure({type:'listadd',listId:L.id,item:gone});V.listas()})};
+  });
+}
+/* evento nuevo o editado; la hora se elige con dos ruedas nativas (hora y minutos),
+   que andan igual de bien en iPhone y Android, en vez del selector de hora del navegador */
+function eventForm(ev){
+  const ed=!!ev;ev=ev||{d:selD,tm:'',t:'',who:'ambos'};
+  let w=ev.who||'ambos',[hh,mi]=(ev.tm||'').split(':');hh=hh||'';mi=mi||'00';
+  const quick=[['','Todo el día'],['09','9:00'],['13','13:00'],['18','18:00'],['21','21:00']];
+  const hOpts=['<option value="">—</option>'].concat(Array.from({length:24},(_,i)=>{const v=String(i).padStart(2,'0');return `<option value="${v}">${v}</option>`})).join('');
+  const mOpts=Array.from({length:12},(_,i)=>{const v=String(i*5).padStart(2,'0');return `<option value="${v}">${v}</option>`}).join('');
+  sheet(`<h2>${ed?'Editar evento':'Nuevo evento'}</h2>
+    <div class="field"><label for="et">Qué</label><input class="input" id="et" maxlength="60" placeholder="Ej: Cine a la noche" value="${esc(ev.t)}"></div>
+    <div class="field"><label for="ed">Día</label><input class="input" type="date" id="ed" value="${ev.d}"></div>
+    <div class="field"><span class="flabel">Hora</span><div class="chips" id="eq">${quick.map(([v,n])=>`<button class="chip" data-h="${v}">${n}</button>`).join('')}</div>
+      <div class="row" style="align-items:center;gap:8px"><select class="input" id="eh" aria-label="Hora">${hOpts}</select><b style="font-size:20px">:</b><select class="input" id="em" aria-label="Minutos">${mOpts}</select></div></div>
+    <div class="field"><span class="flabel">De quién</span><div class="seg" id="ew" style="grid-template-columns:1fr 1fr 1fr">${[['ambos','Los dos'],['m',meName()],['p',S.partner]].map(([k,n])=>`<button data-w="${k}" class="${w===k?'on':''}">${esc(n)}</button>`).join('')}</div></div>
+    <div class="row">${ed?'<button class="btn danger" id="eDel">Borrar</button>':''}<button class="btn" id="eOk" style="flex:1">${ed?'Guardar':'Guardar evento'}</button></div>`,()=>{
+      const H=$('#eh'),M=$('#em');H.value=hh;M.value=(Math.round(+mi/5)*5%60+'').padStart(2,'0');
+      const paint=()=>{M.disabled=!H.value;M.style.opacity=H.value?1:.4;document.querySelectorAll('#eq [data-h]').forEach(b=>b.classList.toggle('on',b.dataset.h===H.value&&(!H.value||M.value==='00')))};
+      H.onchange=paint;M.onchange=paint;
+      document.querySelectorAll('#eq [data-h]').forEach(b=>b.onclick=()=>{H.value=b.dataset.h;M.value='00';paint()});paint();
+      document.querySelectorAll('#ew button').forEach(b=>b.onclick=()=>{w=b.dataset.w;document.querySelectorAll('#ew button').forEach(x=>x.classList.toggle('on',x===b))});
+      if(!ed)$('#et').focus();
+      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return $('#ed').focus();
+        const tm=H.value?H.value+':'+M.value:'';
+        if(ed){Object.assign(ev,{t,d,tm,who:w});save();netSendSure({type:'eventadd',ev});pushPartner('Cambió un evento',t+(tm?' · '+tm:''),'event')}
+        else{const ne={id:uid(),d,tm,t,who:w};S.events.push(ne);save();netSendSure({type:'eventadd',ev:ne});pushPartner('Agregó un evento',t+(tm?' · '+tm:''),'event');entangle()}
+        selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();toast(ed?'Evento guardado':'Evento agregado')};
+      if(ed)$('#eDel').onclick=()=>{S.events=S.events.filter(e=>e!==ev);save();netSendSure({type:'eventdel',id:ev.id});closeSheet();V.calendario();toast('Evento borrado','Deshacer',()=>{S.events.push(ev);save();netSendSure({type:'eventadd',ev});V.calendario()})};
   });
 }
 let curList='tareas';
@@ -2051,20 +2083,14 @@ V.calendario=function(){
   </section>
   <section class="section">
     <div class="sechead"><h3>${fmtD(selD)}${selD===TODAYS?' · hoy':''}</h3><button class="btn soft" id="addE" style="padding:9px 14px">+ Evento</button></div>
-    <div class="evs">${evs.length?evs.map(e=>`<div class="ev"><span class="bar" style="background:${whoColor(e.who)}"></span><span class="tm">${e.tm||'Todo el día'}</span><div style="flex:1;min-width:0"><b>${esc(e.t)}</b><div class="sub">${e.who==='ambos'?'Los dos':esc(e.who==='m'?meName():S.partner)}</div></div><button class="x" data-x="${e.id}" aria-label="Borrar ${esc(e.t)}">${ICON.x}</button></div>`).join(''):'<p class="empty">Nada planeado este día.</p>'}</div>
+    <div class="evs">${evs.length?evs.map(e=>`<div class="ev"><span class="bar" style="background:${whoColor(e.who)}"></span><span class="tm">${e.tm||'Todo el día'}</span><div style="flex:1;min-width:0;cursor:pointer" data-ee="${e.id}" role="button" tabindex="0" aria-label="Editar ${esc(e.t)}"><b>${esc(e.t)}</b><div class="sub">${e.who==='ambos'?'Los dos':esc(e.who==='m'?meName():S.partner)}</div></div><button class="x" data-x="${e.id}" aria-label="Borrar ${esc(e.t)}">${ICON.x}</button></div>`).join(''):'<p class="empty">Nada planeado este día.</p>'}</div>
     ${up?`<div class="note">Próximo: <b>${esc(up.t)}</b> · ${fmtD(up.d)}</div>`:''}
   </section>`);
   $('#pm').onclick=()=>{calM=new Date(y,m-1,1);V.calendario()};$('#nm').onclick=()=>{calM=new Date(y,m+1,1);V.calendario()};
   document.querySelectorAll('.day').forEach(b=>b.onclick=()=>{selD=b.dataset.d;V.calendario()});
   document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{const ev=S.events.find(e=>e.id===b.dataset.x);S.events=S.events.filter(e=>e!==ev);save();netSendSure({type:'eventdel',id:ev.id});V.calendario();toast('Evento borrado','Deshacer',()=>{S.events.push(ev);save();netSendSure({type:'eventadd',ev});V.calendario()})});
-  $('#addE').onclick=()=>sheet(`<h2>Nuevo evento</h2>
-    <div class="field"><label for="et">Qué</label><input class="input" id="et" maxlength="60" placeholder="Ej: Cine a la noche"></div>
-    <div class="row"><div class="field" style="flex:1;min-width:0"><label for="ed">Día</label><input class="input" type="date" id="ed" value="${selD}"></div><div class="field" style="flex:1;min-width:0"><label for="eh">Hora</label><input class="input" type="time" id="eh"></div></div>
-    <div class="field"><span class="flabel">De quién</span><div class="seg" id="ew" style="grid-template-columns:1fr 1fr 1fr"><button data-w="ambos" class="on">Los dos</button><button data-w="m">${esc(meName())}</button><button data-w="p">${esc(S.partner)}</button></div></div>
-    <button class="btn full" id="eOk">Guardar evento</button>`,()=>{
-      let w='ambos';document.querySelectorAll('#ew button').forEach(b=>b.onclick=()=>{w=b.dataset.w;document.querySelectorAll('#ew button').forEach(x=>x.classList.toggle('on',x===b))});
-      $('#et').focus();
-      $('#eOk').onclick=()=>{const t=$('#et').value.trim(),d=$('#ed').value;if(!t)return $('#et').focus();if(!d)return;const ev={id:uid(),d,tm:$('#eh').value,t,who:w};S.events.push(ev);save();netSendSure({type:'eventadd',ev});pushPartner('Agregó un evento',t,'event');selD=d;const [yy,mm]=d.split('-').map(Number);calM=new Date(yy,mm-1,1);closeSheet();V.calendario();entangle();toast('Evento agregado')}});
+  $('#addE').onclick=()=>eventForm(null);
+  document.querySelectorAll('[data-ee]').forEach(b=>{b.onclick=()=>eventForm(S.events.find(e=>e.id===b.dataset.ee));b.onkeydown=e=>{if(e.key==='Enter')b.click()}});
 };
 
 /* cartas */
@@ -2596,16 +2622,18 @@ NET.onLetter=d=>{
   S.letters.unshift(clean);save();entangle();updateBadge();push(S.partner,'te mandó una carta');
   if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();
 };
+const flipW=w=>w==='m'?'p':w==='p'?'m':w;
 NET.onListAdd=d=>{
   const items=S.lists[d.listId];if(!items||!d.item)return;
   if(items.some(x=>x.id&&x.id===d.item.id))return;
   const it=Object.assign({},d.item);if(it.blob){setBlob(it.k,it.blob);delete it.blob}
-  it.by='p';items.unshift(it);save();entangle();push(S.partner,'agregó algo a una lista');
+  it.by='p';if(it.who)it.who=flipW(it.who);if(it.doneBy)it.doneBy=flipW(it.doneBy);items.unshift(it);save();entangle();push(S.partner,'agregó algo a una lista');
   if(S.tab==='listas'&&!$('#main').hidden)V.listas();
 };
 NET.onEventAdd=d=>{
-  const ev=d.ev;if(!ev||!ev.id)return;
-  if(S.events.some(x=>x.id===ev.id))return;
+  const ev=Object.assign({},d.ev);if(!ev||!ev.id)return;ev.who=flipW(ev.who);
+  const old=S.events.find(x=>x.id===ev.id);
+  if(old){Object.assign(old,ev);save();if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();return}
   S.events.push(ev);save();entangle();push(S.partner,'agregó un evento: '+ev.t);
   if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();
 };
@@ -2632,7 +2660,7 @@ NET.onAlbumDel=d=>{
 NET.onListDone=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const x=items.find(i=>i.id===d.id);if(!x)return;
-  x.done=d.done;if('doneBy'in d)x.doneBy=d.doneBy;save();
+  x.done=d.done;if('doneBy'in d)x.doneBy=flipW(d.doneBy);save();
   if(S.tab==='listas'&&!$('#main').hidden)V.listas();
 };
 NET.onListDel=d=>{
@@ -2644,7 +2672,7 @@ NET.onListDel=d=>{
 NET.onListEdit=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const x=items.find(i=>i.id===d.id);if(!x)return;
-  Object.assign(x,d.patch);save();
+  const pt=Object.assign({},d.patch);if(pt.who)pt.who=flipW(pt.who);Object.assign(x,pt);save();
   if(S.tab==='listas'&&!$('#main').hidden)V.listas();
 };
 NET.onEventDel=d=>{
