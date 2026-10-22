@@ -573,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.50';
+const VERSION='beta 0.51';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -975,7 +975,7 @@ async function ensurePush(){
     const j=sub.toJSON();S.myPushSub=j;save();
     if(NET.ready)netSend({type:'pushsub',sub:j});
     return j;
-  }catch(e){return null}
+  }catch(e){S.lastPushErr=String(e);return null}
 }
 function drainInbox(){
   try{const rq=indexedDB.open('tp-inbox',1);rq.onupgradeneeded=()=>rq.result.createObjectStore('m',{autoIncrement:true});
@@ -1012,6 +1012,22 @@ async function setupCheck(fromTap){
     $('#pOk').onclick=async()=>{closeSheet();const ok=await ensurePush();if(instEv){try{instEv.prompt()}catch(e){}instEv=null}toast(ok?'Listo, quedó activado':'No se pudo activar')};
   });
 }
+/* diagnóstico de avisos: muestra en qué eslabón se corta y, de paso, repara lo que puede
+   (pedir permiso con un toque, renovar y reenviar la suscripción, mandar una prueba) */
+async function pushDiag(){
+  const ok=await ensurePush();
+  if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});
+  let test=null;if(S.partnerPushSub)test=await sendPush(S.partnerPushSub,{title:'Prueba de aviso',body:'Si ves esto, los avisos de '+meName()+' te llegan bien',tag:'test',url:'./',sync:S.myPushSub?[{type:'pushsub',sub:S.myPushSub,mid:uid()}]:[]});
+  const L=(good,t)=>`<li style="margin:6px 0">${good?'✅':'⚠️'} ${t}</li>`;
+  const perm='Notification' in window?Notification.permission:'none';
+  sheet(`<h2>Avisos</h2><ul class="sub" style="list-style:none;padding:0;margin:0 0 12px">
+    ${L(!isIOS||isApp(),isIOS&&!isApp()?'Está abierta desde Safari: en iPhone tiene que abrirse desde el ícono de la pantalla de inicio':'App instalada')}
+    ${L(perm==='granted',perm==='granted'?'Permiso de notificaciones activado':perm==='denied'?'Notificaciones bloqueadas para esta app':'Todavía no diste permiso')}
+    ${L(!!ok,ok?'Este teléfono está listo para recibir avisos':'Este teléfono no puede recibir avisos todavía'+(S.lastPushErr?' ('+esc(S.lastPushErr)+')':''))}
+    ${L(!!S.partnerPushSub,S.partnerPushSub?'Tenés la dirección de avisos de '+esc(S.partner):'Todavía no llegó la dirección de avisos de '+esc(S.partner)+': que abra la app y toque “Revisar avisos”')}
+    ${S.partnerPushSub?L(test===true,test===true?'Aviso de prueba enviado a '+esc(S.partner)+': le tiene que haber llegado':'El aviso de prueba no salió'+(S.lastPush?' ('+esc(S.lastPush.r)+')':'')):''}
+  </ul><button class="btn full" id="dOk">Listo</button>`,()=>$('#dOk').onclick=closeSheet);
+}
 async function sendPush(sub,payloadObj){
   // el navegador ya no puede mandarle el push directo al servicio (FCM/Mozilla/Apple
   // bloquean eso por CORS desde 2022), así que un relay chiquito hace esa parte.
@@ -1019,6 +1035,7 @@ async function sendPush(sub,payloadObj){
     if(!sub||!sub.endpoint)return false;
     const r=await fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({subscription:sub,payload:payloadObj})});
     let j=null;try{j=await r.json()}catch(e){}
+    S.lastPush={t:Date.now(),r:j?(j.ok?'entregado':'el servicio respondió '+j.status):'el relay respondió '+r.status};
     // suscripción vencida del otro lado: se olvida y su teléfono manda una nueva al reconectar
     if(j&&(j.status===404||j.status===410)&&S.partnerPushSub&&S.partnerPushSub.endpoint===sub.endpoint){S.partnerPushSub=null;save();return false}
     return r.ok&&(!j||j.ok!==false);
@@ -1031,7 +1048,9 @@ function pushPartner(title,body,tag){
   // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
   // muestra notificación cuenta como falta y Safari termina cortando todas las notificaciones
   if(tag!=='alarm'&&NET.ready&&partnerVis)return;
-  if(S.partnerPushSub)sendPush(S.partnerPushSub,{sync:takeSync(),title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
+  // una vez por día, la dirección de avisos propia viaja también, por si el otro no la tiene
+  let sy=takeSync();if(S.myPushSub&&S.subSentDay!==TODAYS&&S.partnerPushSub){sy=[{type:'pushsub',sub:S.myPushSub,mid:uid()}].concat(sy);S.subSentDay=TODAYS;save()}
+  if(S.partnerPushSub)sendPush(S.partnerPushSub,{sync:sy,title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
 }
 
 function applySkin(){
@@ -2554,6 +2573,7 @@ $('#openSettings').onclick=()=>{
    <div class="field"><span class="flabel">Cartas</span><div class="group">
      <div><span>Tu letra</span><span class="hand-prev" style="${handStyle(S.prefs.hand,S.prefs.ink)}">${S.prefs.hand?esc(HANDS[S.prefs.hand].n):'Sin elegir'}</span></div></div>
      <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div>
+     ${S.paired?`<p class="sub">¿No le llegan los avisos con la app cerrada? <button class="linkbtn" id="pDiag">Revisar avisos</button></p>`:''}
      ${S.paired&&S.prefs.hand==='mine'?`<p class="sub">¿${esc(S.partner)} no ve tu letra a mano en tus cartas? <button class="linkbtn" id="resendHand">Reenviársela</button></p>`:''}</div>
    <div class="field"><span class="flabel">Vínculo</span><div class="group">
      <div><span>Estado</span><b>${S.paired?'Vinculados':'Partícula solitaria'}</b></div>
@@ -2570,6 +2590,7 @@ $('#openSettings').onclick=()=>{
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
     $('#pmine').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
+    $('#pDiag')&&($('#pDiag').onclick=()=>{closeSheet();pushDiag()});
     $('#resendHand')&&($('#resendHand').onclick=()=>{sendMyFont();toast(NET.ready?'Letra reenviada a '+S.partner:'Guardado · se manda sola en cuanto '+S.partner+' se conecte')});
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
