@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.38';
+const VERSION='beta 0.39';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -824,7 +824,7 @@ function flushOutbox(){
 function netWire(conn){
   NET.conn=conn;NET.remotePeerId=conn.peer;
   if(conn.open){NET.ready=true;netOnStatus(true)}
-  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
+  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});sendMyFont();flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
   conn.on('data',d=>{
     if(!d||!d.type)return;
     if(d.type==='hello'&&NET.onHello)NET.onHello(d);
@@ -844,6 +844,7 @@ function netWire(conn){
     else if(d.type==='eventdel'&&NET.onEventDel)NET.onEventDel(d);
     else if(d.type==='unpair'&&NET.onUnpair)NET.onUnpair();
     else if(d.type==='remind'&&NET.onRemind)NET.onRemind(d);
+    else if(d.type==='fontset'&&NET.onFontSet)NET.onFontSet(d);
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
@@ -2038,7 +2039,7 @@ function pickHand(after,first){
   sheet(`<h2>${first?'Antes de tu primera carta: elegí tu letra':'Tu letra'}</h2>
     <p class="sub">Así se ven las cartas que escribís desde el teléfono. La podés cambiar cuando quieras desde Ajustes.</p>
     <button class="mk-hand" id="mkHand"><span class="mk-ic">${ICON.pen}</span><span><b>${HANDS.mine?'Rehacer mi letra':'Crear una tipografía con mi letra'}</b><span class="sub">${HANDS.mine?'Rehacé letras o cambiá el grosor':'Escaneá tu letra con fotos o dibujala con el dedo'}</span></span></button>
-    <div class="hands" id="hands">${Object.entries(HANDS).map(([k,H])=>`<button class="hand ${k===h?'on':''}" data-h="${k}" aria-pressed="${k===h}"><span class="paper-mini" style="${handStyle(k,ink)}">Te extraño, nos vemos a la noche.</span><span class="hand-n">${H.n}</span></button>`).join('')}</div>
+    <div class="hands" id="hands">${Object.entries(HANDS).filter(([k])=>k!=='p').map(([k,H])=>`<button class="hand ${k===h?'on':''}" data-h="${k}" aria-pressed="${k===h}"><span class="paper-mini" style="${handStyle(k,ink)}">Te extraño, nos vemos a la noche.</span><span class="hand-n">${H.n}</span></button>`).join('')}</div>
     <div class="field"><span class="flabel">Tinta</span><div class="chips" id="inks">${Object.entries(INKS).map(([k,I])=>`<button class="chip ${k===ink?'on':''}" data-i="${k}" aria-pressed="${k===ink}"><span class="inkdot" style="background:${I.c}"></span>${I.n}</button>`).join('')}</div></div>
     <button class="btn full" id="hOk">Usar esta letra</button>`,()=>{
     const paint=()=>{document.querySelectorAll('.hand').forEach(b=>{b.classList.toggle('on',b.dataset.h===h);b.setAttribute('aria-pressed',b.dataset.h===h);b.querySelector('.paper-mini').setAttribute('style',handStyle(b.dataset.h,ink))});document.querySelectorAll('#inks [data-i]').forEach(b=>{b.classList.toggle('on',b.dataset.i===ink);b.setAttribute('aria-pressed',b.dataset.i===ink)})};
@@ -2048,7 +2049,10 @@ function pickHand(after,first){
     $('#hOk').onclick=()=>{S.prefs.hand=h;S.prefs.ink=ink;save();toast('Letra guardada');after?after():closeSheet()};
   });
 }
-const paperHTML=(l,sign)=>`<div class="sheet-paper" style="${handStyle(l.hand,l.ink)}"><span class="pdate">${fmtLong(l.date).replace(/ de \d{4}$/,'')}</span><div class="ptext">${esc(l.text)}</div>${sign?`<div class="psign">${esc(sign)}</div>`:''}</div>`;
+// "mine" en una carta significa "la letra de quien la escribió": si la
+// escribió la pareja, hay que usar SU fuente (HANDS.p), no la propia
+const letterHand=l=>(l.from==='p'&&l.hand==='mine')?'p':l.hand;
+const paperHTML=(l,sign)=>`<div class="sheet-paper" style="${handStyle(letterHand(l),l.ink)}"><span class="pdate">${fmtLong(l.date).replace(/ de \d{4}$/,'')}</span><div class="ptext">${esc(l.text)}</div>${sign?`<div class="psign">${esc(sign)}</div>`:''}</div>`;
 
 async function openLetter(l){
   const locked=l.openAt&&l.openAt>TODAYS&&l.from==='p';
@@ -2277,6 +2281,27 @@ function mfLoadSaved(){
   HANDS.mine={n:'Mi letra',f:"'Caveat', cursive",s:30};
   mfInstall(unb64(s)).then(()=>{if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}).catch(()=>{});
 }
+// la "letra a mano" de cada uno es una tipografía armada localmente en su
+// propio teléfono: sin mandarla, la carta le llega a la pareja sin esa letra
+// (se ve con la genérica). Por eso se la mandamos de verdad por el canal.
+function sendMyFont(){
+  if(S.prefs.hand!=='mine')return;
+  let s=null;try{s=localStorage.getItem('tp-font')}catch(e){}
+  if(s)netSend({type:'fontset',buf:s});
+}
+let pFace=null;
+async function installPartnerFont(buf){
+  try{if(pFace)document.fonts.delete(pFace)}catch(e){}
+  const fam='TPParejaLetra-'+Date.now().toString(36);
+  const ff=new FontFace(fam,buf);await ff.load();document.fonts.add(ff);pFace=ff;
+  HANDS.p={n:'Letra de '+S.partner,f:`'${fam}', 'Caveat', cursive`,s:30};
+}
+function loadSavedPartnerFont(){
+  let s=null;try{s=localStorage.getItem('tp-partner-font')}catch(e){}
+  if(!s)return;
+  HANDS.p={n:'Letra de '+S.partner,f:"'Caveat', cursive",s:30};
+  installPartnerFont(unb64(s)).then(()=>{if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}).catch(()=>{});
+}
 
 /* ---- asistente ---- */
 let W=null;
@@ -2395,7 +2420,7 @@ async function mfReview(){
   document.querySelectorAll('#mfThick [data-t]').forEach(b=>b.onclick=()=>{W.thick=+b.dataset.t;document.querySelectorAll('#mfThick [data-t]').forEach(x=>x.classList.toggle('on',x===b));build()});
   $('#mfSave').onclick=()=>{let kept=true;try{localStorage.setItem('tp-font',b64(buf))}catch(e){kept=false}
     if(!kept)setTimeout(()=>toast('Tu letra se usa ahora, pero no se pudo guardar para la próxima vez'),2200);
-    S.prefs.hand='mine';S.prefs.mfThick=W.thick;save();mfClose();toast('Listo: tus cartas ahora usan tu letra');vib([20,40,20]);if(S.tab==='cartas')V.cartas()};
+    S.prefs.hand='mine';S.prefs.mfThick=W.thick;save();sendMyFont();mfClose();toast('Listo: tus cartas ahora usan tu letra');vib([20,40,20]);if(S.tab==='cartas')V.cartas()};
   if(have)build();else{$('#mfPrevT').textContent='Todavía no escaneaste ninguna letra.'}
 }
 
@@ -2452,6 +2477,7 @@ new MutationObserver(readColors).observe(document.documentElement,{attributes:tr
 /* arranque */
 applySkin();
 mfLoadSaved();
+loadSavedPartnerFont();
 NET.onSignal=d=>receive(d.text);
 NET.onTouch=d=>{S.feed.unshift({from:'p',text:d.n>1?d.n+' toques':'Un toque',t:Date.now()});save();entangle();push(S.partner,'te tocó');vib(d.n>1?[18,60,18,60,18]:14);renderFeed&&renderFeed()};
 NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:Date.now()});save();entangle();push(S.partner,'te mandó un latido de '+d.secs+' s');vib([40,70,40,70,40]);renderFeed&&renderFeed()};
@@ -2524,6 +2550,11 @@ NET.onEventDel=d=>{
   if(!d.id)return;
   S.events=S.events.filter(e=>e.id!==d.id);save();
   if(S.tab==='calendario'&&!$('#main').hidden)V.calendario();
+};
+NET.onFontSet=d=>{
+  if(!d.buf)return;
+  try{localStorage.setItem('tp-partner-font',d.buf)}catch(e){}
+  installPartnerFont(unb64(d.buf)).then(()=>{if(S.tab==='cartas'&&!$('#main').hidden)V.cartas()}).catch(()=>{});
 };
 NET.onRemind=d=>{
   S.feed.unshift({from:'p',text:'Recordatorio: '+d.text,t:Date.now()});save();entangle();
