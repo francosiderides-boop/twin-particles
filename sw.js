@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.43';
+const CACHE='tp-beta-0.44';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -34,9 +34,13 @@ self.addEventListener('push',e=>{
     // propia vibración correcta); mostrar también la notificación del sistema
     // solo duplicaría vibración y sonido. La excepción es la alarma: si en ese
     // momento no llegó a conectarse de verdad, es la única forma de que suene.
-    if(tag!=='alarm'){
-      const cl=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-      if(cl.some(c=>c.visibilityState==='visible'))return;
+    const cl=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    const vis=cl.filter(c=>c.visibilityState==='visible');
+    if(vis.length){
+      // app a la vista: la alarma suena adentro (con su tono fuerte) aunque la
+      // conexión directa se haya caído; el resto ya llegó en vivo
+      if(tag==='alarm')vis.forEach(c=>c.postMessage({type:'ring'}));
+      return;
     }
     await self.registration.showNotification(title,{
       body:d.body||'',
@@ -47,6 +51,7 @@ self.addEventListener('push',e=>{
       requireInteraction:tag==='alarm',
       silent:false, // que quede explícito: el sonido del sistema no está apagado por acá
       vibrate:VIB[tag]||[60,40,60],
+      timestamp:Date.now(),
       data:{url:d.url||'./'}
     });
   })());
