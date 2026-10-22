@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.44';
+const VERSION='beta 0.45';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -604,7 +604,11 @@ function haptic(){ // iPhone (iOS 18+): tocar un interruptor nativo produce un t
 function vib(p){
   try{if(S&&S.prefs&&!S.prefs.vib)return}catch(e){}
   try{if(canVibrate){navigator.vibrate(p);return}}catch(e){}
-  if(Array.isArray(p)){let t=0;p.slice(0,12).forEach((d,i)=>{if(i%2===0)setTimeout(haptic,t);t+=d})}else haptic();
+  const one=()=>{haptic();thump()};
+  if(Array.isArray(p)){let t=0;p.slice(0,40).forEach((d,i)=>{if(i%2===0)setTimeout(one,t);t+=d})}else one();
+}
+function thump(){ // golpe grave, como un latido que se escucha (iPhone no deja vibrar desde la web)
+  try{if(!S.prefs.sound)return;const c=AU.ctx;if(!c||c.state!=='running')return;const t=c.currentTime+.01;AU.tone(70,t,.16,'sine',.5,null,45)}catch(e){}
 }
 const AU={
   ctx:null,out:null,bus:null,iv:null,vibIv:null,
@@ -836,7 +840,7 @@ function flushOutbox(){
 function netWire(conn){
   NET.conn=conn;NET.remotePeerId=conn.peer;
   if(conn.open){NET.ready=true;netOnStatus(true)}
-  conn.on('open',()=>{NET.ready=true;netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});sendMyFont();flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
+  conn.on('open',()=>{NET.ready=true;sendVis();netOnStatus(true);if(S.myPushSub)netSend({type:'pushsub',sub:S.myPushSub});sendMyFont();flushOutbox();NET.onPairConnect&&NET.onPairConnect()});
   conn.on('data',d=>{
     if(!d||!d.type)return;
     if(d.type==='hello'&&NET.onHello)NET.onHello(d);
@@ -847,6 +851,7 @@ function netWire(conn){
     else if(d.type==='beatOn'&&NET.onBeatOn)NET.onBeatOn(d);
     else if(d.type==='beatOff'&&NET.onBeatOff)NET.onBeatOff(d);
     else if(d.type==='felt'&&NET.onFelt)NET.onFelt(d);
+    else if(d.type==='vis')partnerVis=!!d.v;
     else if(d.type==='alarm'&&NET.onAlarm)NET.onAlarm(d);
     else if(d.type==='alarmResp'&&NET.onAlarmResp)NET.onAlarmResp(d);
     else if(d.type==='letter'&&NET.onLetter)NET.onLetter(d);
@@ -866,7 +871,7 @@ function netWire(conn){
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
     else if(d.type==='state'&&NET.onState)NET.onState(d);
   });
-  conn.on('close',()=>{NET.ready=false;netOnStatus(false);netScheduleReconnect()});
+  conn.on('close',()=>{NET.ready=false;partnerVis=false;netOnStatus(false);netScheduleReconnect()});
   conn.on('error',()=>{NET.ready=false;netOnStatus(false)});
 }
 function netOnStatus(on){
@@ -966,7 +971,13 @@ async function sendPush(sub,payloadObj){
     return r.ok;
   }catch(e){return false}
 }
+let partnerVis=false;
+function sendVis(){netSend({type:'vis',v:document.visibilityState==='visible'})}
+document.addEventListener('visibilitychange',sendVis);
 function pushPartner(title,body,tag){
+  // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
+  // muestra notificación cuenta como falta y Safari termina cortando todas las notificaciones
+  if(tag!=='alarm'&&NET.ready&&partnerVis)return;
   if(S.partnerPushSub)sendPush(S.partnerPushSub,{title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
 }
 

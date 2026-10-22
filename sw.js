@@ -1,5 +1,5 @@
 // Twin Particles: abre sin conexión y busca siempre la versión más nueva
-const CACHE='tp-beta-0.44';
+const CACHE='tp-beta-0.45';
 const FILES=['./','index.html','manifest.webmanifest','icon-192.png','icon-512.png','maskable-192.png','maskable-512.png','apple-touch-icon.png','favicon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))));self.clients.claim()});
@@ -36,10 +36,13 @@ self.addEventListener('push',e=>{
     // momento no llegó a conectarse de verdad, es la única forma de que suene.
     const cl=await self.clients.matchAll({type:'window',includeUncontrolled:true});
     const vis=cl.filter(c=>c.visibilityState==='visible');
-    if(vis.length){
+    // iPhone: Safari exige mostrar una notificación por cada push; si no, después
+    // de unas pocas veces corta las notificaciones del todo
+    const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(/Macintosh/.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+    if(vis.length&&tag==='alarm')vis.forEach(c=>c.postMessage({type:'ring'}));
+    if(vis.length&&!IOS){
       // app a la vista: la alarma suena adentro (con su tono fuerte) aunque la
       // conexión directa se haya caído; el resto ya llegó en vivo
-      if(tag==='alarm')vis.forEach(c=>c.postMessage({type:'ring'}));
       return;
     }
     await self.registration.showNotification(title,{
