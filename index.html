@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.36';
+const VERSION='beta 0.37';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -910,6 +910,7 @@ function netConnectToPartner(){
 // además de reaccionar a 'close'/'error', probamos reconectar cada vez que
 // la app vuelve a primer plano, vuelve el internet, o cada tanto si quedó
 // "colgada" sin que nadie se diera cuenta.
+if('serviceWorker' in navigator)navigator.serviceWorker.addEventListener('message',e=>{if(e.data&&e.data.type==='ring')ringIncoming(S.partner,false,false)});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&S.paired)netConnectToPartner()});
 window.addEventListener('pageshow',()=>{if(S.paired)netConnectToPartner()});
 window.addEventListener('online',()=>{if(S.paired)netConnectToPartner()});
