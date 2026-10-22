@@ -570,7 +570,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.39';
+const VERSION='beta 0.40';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -708,6 +708,10 @@ if(!S||!S.lists)S=JSON.parse(JSON.stringify(DEF));
 if(!S.prefs)S.prefs={vib:true,sound:true,tone:'entrelazado'};
 if(!S.lists.tareas)S.lists.tareas=[];
 if(S.v!==VERSION){const old=String(S.v||'');if(!old||/^beta 0\.[0-8]$/.test(old)){['feed','albums','events','letters'].forEach(k=>S[k]=[]);S.lists=JSON.parse(JSON.stringify(DEF.lists));S.ignored=0;S.lastHeavy=0;S.draft=null}S.v=VERSION;if(S.paired===undefined)S.paired=false;if(S.me==='Vos')S.me=''}
+// las tareas/ítems creados antes de que las listas empezaran a sincronizarse
+// de verdad (beta 0.30) no tenían un identificador propio, así que no se
+// pueden avisar al otro teléfono cuando se marcan o se borran. Se lo damos acá.
+Object.values(S.lists||{}).forEach(items=>{(items||[]).forEach(it=>{if(it&&!it.id)it.id=uid()})});
 const meName=()=>'Vos';
 if(!S.partner)S.partner='Mi pareja';
 const blobs={};
