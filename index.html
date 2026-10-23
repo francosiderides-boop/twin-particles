@@ -573,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.52';
+const VERSION='beta 0.53';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -829,6 +829,7 @@ async function fbStart(){
       const d=snap.data()||{},subs=d.subs||{},vis=d.vis||{},p=(d.members||[]).find(x=>x!==FB.uid);
       if(p&&subs[p]&&(!S.partnerPushSub||S.partnerPushSub.endpoint!==subs[p].endpoint)){S.partnerPushSub=subs[p];save()}
       partnerVis=!!(p&&vis[p]&&vis[p].v&&Date.now()-vis[p].t<90000);
+      partnerDiag=p&&d.diag&&d.diag[p]||null;
       if(S.myPushSub&&(!subs[FB.uid]||subs[FB.uid].endpoint!==S.myPushSub.endpoint))fbSub(S.myPushSub);
     },e=>{FB.err=String(e.code||e)});
     FB.ref.collection('msgs').orderBy('t').onSnapshot(snap=>{
@@ -839,7 +840,7 @@ async function fbStart(){
         ch.doc.ref.delete().catch(()=>{});
       });
     },e=>{FB.err=String(e.code||e)});
-    fbVis();
+    fbVis();fbDiag();
   }catch(e){FB.started=0;FB.err=String(e&&(e.code||e.message)||e);setTimeout(fbStart,15000)}
 }
 function fbWrite(msg){
@@ -849,6 +850,9 @@ function fbWrite(msg){
 }
 function fbSub(sub){if(FB.ready&&sub)FB.ref.update({['subs.'+FB.uid]:sub}).catch(()=>{})}
 function fbVis(){if(FB.ready)FB.ref.update({['vis.'+FB.uid]:{v:document.visibilityState==='visible',t:Date.now()}}).catch(()=>{})}
+// estado de avisos de este teléfono: la pareja lo ve en "Revisar avisos" sin tener que pedirle nada
+function fbDiag(){if(!FB.ready)return;const perm='Notification' in window?Notification.permission:'none';
+  FB.ref.update({['diag.'+FB.uid]:{ios:isIOS,app:isApp(),perm,sub:!!S.myPushSub,ok:!S.pushBlocked&&!!S.myPushSub,err:S.lastPushErr||null,v:VERSION,t:Date.now()}}).catch(()=>{})}
 setInterval(()=>{if(document.visibilityState==='visible')fbVis()},60000);
 function netSend(msg){
   if(S.paired&&coupleId()&&FB.ready){fbWrite(msg);return}
@@ -1028,7 +1032,7 @@ async function ensurePush(){
     const reg=await navigator.serviceWorker.ready;
     let sub=await reg.pushManager.getSubscription();
     if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBuf(VAPID_PUB)});
-    const j=sub.toJSON();S.myPushSub=j;save();fbSub(j);
+    const j=sub.toJSON();S.myPushSub=j;save();fbSub(j);fbDiag();
     if(NET.ready)netSend({type:'pushsub',sub:j});
     return j;
   }catch(e){S.lastPushErr=String(e);return null}
@@ -1083,7 +1087,17 @@ async function pushDiag(){
     ${L(!!ok,ok?'Este teléfono está listo para recibir avisos':'Este teléfono no puede recibir avisos todavía'+(S.lastPushErr?' ('+esc(S.lastPushErr)+')':''))}
     ${L(!!S.partnerPushSub,S.partnerPushSub?'Tenés la dirección de avisos de '+esc(S.partner):'Todavía no llegó la dirección de avisos de '+esc(S.partner)+': que abra la app y toque “Revisar avisos”')}
     ${S.partnerPushSub?L(test===true,test===true?'Aviso de prueba enviado a '+esc(S.partner)+': le tiene que haber llegado':'El aviso de prueba no salió'+(S.lastPush?' ('+esc(S.lastPush.r)+')':'')):''}
-  </ul><button class="btn full" id="dOk">Listo</button>`,()=>$('#dOk').onclick=closeSheet);
+  </ul>${diagPartner(L)}<button class="btn full" id="dOk">Listo</button>`,()=>$('#dOk').onclick=closeSheet);
+}
+function diagPartner(L){
+  const q=partnerDiag,n=esc(S.partner);
+  if(!q)return `<p class="sub">El teléfono de ${n} todavía no mandó su estado: llega solo la próxima vez que abra la app.</p>`;
+  const ago=Math.round((Date.now()-q.t)/60000),when=ago<2?'recién':ago<90?'hace '+ago+' min':ago<2880?'hace '+Math.round(ago/60)+' h':'hace '+Math.round(ago/1440)+' días';
+  return `<h3 style="margin:4px 0">Teléfono de ${n}</h3><p class="sub" style="margin:0">Última vez que abrió la app: ${when} (${esc(q.v||'')})</p><ul class="sub" style="list-style:none;padding:0;margin:4px 0 12px">
+    ${q.ios?L(q.app,q.app?'Abre la app desde el ícono de inicio':'La abre desde Safari: así en iPhone no le llegan avisos con la app cerrada'):''}
+    ${L(q.perm==='granted',q.perm==='granted'?'Notificaciones permitidas':q.perm==='denied'?'Tiene las notificaciones bloqueadas para la app':'Todavía no dio permiso de notificaciones')}
+    ${L(!!q.ok,q.ok?'Su teléfono está listo para recibir avisos':'Su teléfono todavía no puede recibir avisos'+(q.err?' ('+esc(q.err)+')':''))}
+  </ul>`;
 }
 async function sendPush(sub,payloadObj){
   // el navegador ya no puede mandarle el push directo al servicio (FCM/Mozilla/Apple
@@ -1098,8 +1112,8 @@ async function sendPush(sub,payloadObj){
     return r.ok&&(!j||j.ok!==false);
   }catch(e){return false}
 }
-let partnerVis=false;
-function sendVis(){fbVis()}
+let partnerVis=false,partnerDiag=null;
+function sendVis(){fbVis();if(document.visibilityState==='visible')fbDiag()}
 document.addEventListener('visibilitychange',sendVis);
 function pushPartner(title,body,tag){
   // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
