@@ -573,7 +573,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.53';
+const VERSION='beta 0.54';
 const CHANGELOG=[
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -1112,6 +1112,10 @@ async function sendPush(sub,payloadObj){
     return r.ok&&(!j||j.ok!==false);
   }catch(e){return false}
 }
+// la alarma la repite el servidor (sigue aunque este teléfono se bloquee) hasta que la pareja conteste
+let serverRep=0;
+async function relayRepeat(sub,payload){try{const r=await fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({subscription:sub,payload,repeat:{every:6,for:180}})});const j=await r.json();return !!(j&&j.repeat)}catch(e){return false}}
+function relayStop(sub){if(sub&&sub.endpoint)fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({stop:sub.endpoint})}).catch(()=>{})}
 let partnerVis=false,partnerDiag=null;
 function sendVis(){fbVis();if(document.visibilityState==='visible')fbDiag()}
 document.addEventListener('visibilitychange',sendVis);
@@ -1569,7 +1573,7 @@ function renderAlarm(){
       <div class="ringbar"><i id="rbar"></i></div>
       <button class="btn soft full" id="stopA">Detener alarma</button>`;
     const dur=hv?7000:8000,st=performance.now();const tick=()=>{const b=$('#rbar');if(!b||alarmState==='idle')return;b.style.width=Math.min(100,(performance.now()-st)/dur*100)+'%';if(performance.now()-st<dur)requestAnimationFrame(tick)};tick();
-    $('#stopA').onclick=()=>{clearTimeout(alarmTO);alarmState='idle';renderAlarm();toast('Alarma detenida')};
+    $('#stopA').onclick=()=>{clearTimeout(alarmTO);alarmState='idle';relayStop(S.partnerPushSub);renderAlarm();toast('Alarma detenida')};
   }else if(alarmState==='sent'){
     const hv=S.lastAlarm&&S.lastAlarm.heavy;
     el.innerHTML=`<div class="ringing ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado enviado':'Alarma enviada'} a ${esc(S.partner)}</b><div class="sub">${hhmm(S.lastAlarm.t)}${alarmRepIv?' · le vuelve a sonar cada 6 s hasta que conteste (dejá esta pantalla abierta)':''}</div></div></div>
@@ -1591,7 +1595,9 @@ function renderAlarm(){
 function fire(heavy){
   alarmState='sent';S.lastAlarm={heavy:!!heavy,t:Date.now()};save();entangle();vib(heavy?[120,60,120,60,120]:[60,40,60]);renderAlarm();
   S.feed.unshift({from:'m',text:heavy?'Alarma de sueño pesado':'Alarma para despertar',t:Date.now()});save();renderFeed();
-  netSendSure({type:'alarm',heavy:!!heavy,t:Date.now()});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Tocá para apagarla','alarm');alarmRepeat(heavy);renderAlarm();
+  netSendSure({type:'alarm',heavy:!!heavy,t:Date.now()});pushPartner(heavy?'Necesita que te despiertes YA':'Te está despertando','Tocá para apagarla','alarm');serverRep=0;
+  if(S.partnerPushSub)relayRepeat(S.partnerPushSub,{title:heavy?'Necesita que te despiertes YA':'Te está despertando',body:'Tocá para apagarla',tag:'alarm',url:'./#ring',ttl:600,sync:[{type:'alarm',heavy:!!heavy,t:Date.now(),mid:uid()}]}).then(ok=>serverRep=ok?1:0);
+  alarmRepeat(heavy);renderAlarm();
   if(!NET.ready)toast(S.partnerPushSub?'Le suena como notificación y se repite hasta que conteste':'Guardado · '+S.partner+' no tiene las notificaciones activadas, no va a sonarle con la app cerrada');
 }
 
@@ -1604,7 +1610,7 @@ function alarmRepeat(heavy){clearInterval(alarmRepIv);let n=0;
   try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(l=>repLock=l,()=>{})}catch(e){}
   alarmRepIv=setInterval(()=>{
   if(alarmState!=='sent'||++n>30){clearInterval(alarmRepIv);alarmRepIv=null;try{repLock&&repLock.release()}catch(e){}repLock=null;return}
-  pushPartner((heavy?'Necesita que te despiertes YA':'Te está despertando')+' ('+(n+1)+')','Tocá para apagarla','alarm');
+  if(!serverRep)pushPartner((heavy?'Necesita que te despiertes YA':'Te está despertando')+' ('+(n+1)+')','Tocá para apagarla','alarm');
   if(NET.ready)netSend({type:'alarm',heavy:!!heavy,t:Date.now()});
 },6000)}
 /* pantalla de alarma entrante */
@@ -1650,6 +1656,7 @@ function stopRing(how){
   try{wakeLock&&wakeLock.release()}catch(e){}wakeLock=null;
   const el=$('#ring');if(el)el.remove();
   const r=ringing;ringing=null;if(!r)return;
+  if(!r.test)relayStop(S.myPushSub);
   if(r.test)return toast(how==='snooze'?'Prueba terminada · se repetiría en 5 min':'Prueba terminada');
   if(how==='snooze'){S.feed.unshift({from:'m',text:'5 minutos más',t:Date.now()});save();renderFeed();entangle();netSendSure({type:'alarmResp',how:'snooze'});pushPartner('Pidió 5 minutos más','','alarmResp');toast(NET.ready?S.partner+' sabe que pediste 5 minutos más':'Guardado · no se pudo avisar a '+S.partner)}
   else{S.feed.unshift({from:'m',text:'Ya me desperté',t:Date.now()});save();renderFeed();entangle();netSendSure({type:'alarmResp',how:'off'});pushPartner('Ya se despertó','','alarmResp');toast(NET.ready?'Alarma apagada · '+S.partner+' ya lo sabe':'Alarma apagada · no se pudo avisar a '+S.partner)}
@@ -2701,6 +2708,7 @@ NET.onBeat=d=>{S.feed.unshift({from:'p',text:'Latido de '+d.secs+' s',t:d.ts||Da
   heartStop();if(!d.late&&Date.now()-pBeatLive>(d.secs+5)*1000){const p=[],k=Math.min(d.secs||1,20);for(let i=0;i<k;i++)p.push(60,120,90,630);vib(p);feltBack()}pBeatLive=0;renderFeed&&renderFeed()};
 NET.onAlarm=d=>{if(d.t&&Date.now()-d.t>10*60*1000)return;ringIncoming(S.partner,false,!!d.heavy)};
 NET.onAlarmResp=d=>{clearInterval(alarmRepIv);alarmRepIv=null;try{repLock&&repLock.release()}catch(e){}repLock=null;
+  relayStop(S.partnerPushSub);
   if(d.how==='off'){S.ignored=0;save();alarmState='idle';toast(S.partner+' se despertó')}
   else{toast(S.partner+' pidió 5 minutos más')}
   if($('#alarm'))renderAlarm();
