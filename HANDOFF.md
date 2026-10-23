@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.52
+**Versión actual:** beta 0.54
 
 ## Contexto (resumen del chat anterior)
 - **Quiénes:** Franco (Android, dueño del proyecto) y Cami, su pareja (iPhone 11). Franco escribe en español rioplatense y espera que cada arreglo se publique de verdad (versión nueva + commit + push), probado, no solo explicado. Pide **gastar pocos tokens**.
@@ -37,21 +37,21 @@
 - **Quién es quién:** `who`/`doneBy` son relativos (`m` = yo, `p` = pareja); al recibir se invierten con `flipW`.
 - **Avisos (Web Push):** `ensurePush` (suscribe), `pushPartner(title,body,tag)` → `sendPush` → relay de Cloudflare → servicio push (Apple/Google). El relay agrega `Urgency: high` para alarm/touch/beat/letter.
 - **Service worker (`sw.js`):** caché offline, muestra notificaciones, en iPhone **siempre** muestra una por push (si no, Safari corta los avisos), cada repetición de alarma es una notificación nueva con etiqueta única.
-- **Alarma:** el que la manda reenvía el push cada 6 s por 3 min (`alarmRepeat`) hasta recibir `alarmResp`; pantalla encendida con Wake Lock mientras tanto.
+- **Alarma (beta 0.54):** el Worker la repite cada 6 s por 3 min (Durable Object `Rep`, `relayRepeat`) aunque el teléfono que la manda se bloquee; se corta con `relayStop` (al contestar, al detenerla o al recibir `alarmResp`). Si el Worker no responde, sigue el respaldo local `alarmRepeat`.
+- **Diagnóstico remoto (beta 0.53):** cada teléfono escribe `diag.{uid}` en Firestore (`fbDiag`); "Revisar avisos" muestra el estado del teléfono de la pareja (`diagPartner`).
 - **Toques/latidos:** `tap` (cada toque al instante), `beatOn`/`beatOff` (latido en vivo), `felt` (confirmación "le vibró ✓"). En iPhone no hay vibración web: suena un golpe grave (`thump`).
 - **Letra a mano:** fuente propia en `localStorage['tp-font']`; se manda a la pareja (`sendMyFont` / `fontset`).
 - **Diagnóstico:** Ajustes → "Revisar avisos" (`pushDiag`).
 
 ## Relay de avisos (Cloudflare Worker)
 - URL: `https://twin-particales-push.francosiderides.workers.dev`
-- Se edita desde el panel de Cloudflare (Workers → `twin-particales-push` → Edit code). **El código no está en el repo porque contiene la clave privada VAPID**; está guardado en la cuenta de Cloudflare. Para verlo/modificarlo, entrar ahí.
+- Código local en `~/twin-particles-worker` (worker.js + wrangler.toml, fuera del repo). Desplegar: `npx wrangler@4 deploy` (ya logueado en la Mac de Franco). **El código no está en el repo porque contiene la clave privada VAPID**; está guardado en la cuenta de Cloudflare. Para verlo/modificarlo, entrar ahí.
 - La app le manda `{subscription, payload}` con el header `x-relay-key`; el relay cifra y envía con `TTL` = `payload.ttl` y `Urgency`.
 
 ## Límites conocidos (versión web, sin tiendas)
 - iPhone: solo recibe avisos si la app se abre desde el ícono de la pantalla de inicio (iOS 16.4+). Con el teléfono en silencio, iOS no hace sonar avisos de apps web. No hay vibración por patrón.
 - Android: el patrón de vibración de la notificación lo decide el sistema; el sonido depende del canal de notificación.
 - Audios/fotos de más de ~1 MB: necesitan Storage (plan Blaze).
-- La alarma la repite el teléfono que la manda (si se bloquea, el navegador la frena): falta repetirla desde un servidor.
 - Para alarma con tono propio y alertas que pasen el modo silencio: app nativa (App Store / Google Play).
 
 ## Pendiente (en orden)
