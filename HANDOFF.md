@@ -9,8 +9,11 @@
 - **Concepto:** "Twin Particles": lo que le pasa a uno le tiene que pasar al otro. **Todo cambio tiene que sincronizarse en los dos teléfonos.**
 - **Prioridades de Franco:** que la alarma le suene a Cami con el teléfono bloqueado y la app cerrada; que nada se pierda al sincronizar; que los toques vibren y los latidos mantengan la vibración; que la gente **no tenga que configurar el teléfono** (la app pide los permisos una vez, con un toque).
 - **Decisión tomada:** seguir con la versión web gratuita (sin App Store / Google Play) y pasar el backend a Firebase. Ya está hecho el paso 1 (Firestore).
-- **Decisión pendiente de Franco:** cargar tarjeta para el plan **Blaze** de Firebase (Functions + Storage; en la práctica USD 0 o centavos, pero la alerta de presupuesto no corta el gasto) **o** seguir sin tarjeta usando el Worker de Cloudflare como servidor (repetir la alarma desde ahí; no cubre audios grandes).
-- **Sin probar todavía en los teléfonos reales:** beta 0.52 (Firestore). Se probó contra el servidor real simulando a la pareja desde un navegador: señales y tareas llegan en las dos direcciones, se borran al leerse, un tercero no entra.
+- **Decisiones:** solo soluciones **gratis** (ni USD 99 de Apple ni tarjeta); sin pedirle a Cami que haga nada en su teléfono; todo tiene que funcionar dentro de Twin Particles. Se usa el Worker de Cloudflare como servidor, no Blaze.
+- **Problema abierto:** Cami tiene el iPhone **siempre en silencio**, y la alarma tiene que sonarle bloqueado y con la app cerrada. Gratis no hay solución: la web no puede pasar el silencio y la app nativa requiere cuenta paga.
+- **Opciones que Franco ya rechazó:** tono estándar de notificación (no suena en silencio), truco con Atajos + SMS (queda por fuera de la app), "Modo dormir" con audio en loop, cuenta de Apple de USD 99.
+- **IPA gratis (AltStore/SideStore) no conviene:** sin push no llega ninguna notificación con la app cerrada, y vence cada 7 días. Solo ganaría alarmas programadas con AlarmKit (sin confirmar que ande con cuenta gratis).
+- **Sin probar todavía en los teléfonos reales:** betas 0.52 a 0.54. Se probó contra el servidor real simulando a la pareja desde un navegador: señales y tareas llegan en las dos direcciones, se borran al leerse, un tercero no entra.
 
 ## Para arrancar en una sesión nueva (otra cuenta o chat)
 1. Darle acceso al repo `francosiderides-boop/twin-particles` y pedir: "Leé HANDOFF.md y seguí desde ahí".
@@ -54,9 +57,12 @@
 - Audios/fotos de más de ~1 MB: necesitan Storage (plan Blaze).
 - Para alarma con tono propio y alertas que pasen el modo silencio: app nativa (App Store / Google Play).
 
-## Pendiente (en orden)
-1. Que los dos abran y cierren la app (para tomar la beta 0.52) y confirmar que la sincronización por Firestore anda en los teléfonos reales.
-2. En los dos: Ajustes → "Revisar avisos" y ver qué sale con ⚠️ en el iPhone (lo más probable: abierta desde Safari y no desde el ícono de inicio).
-3. Según lo que decida Franco: Blaze (Cloud Function que mande los push y repita la alarma cada ~6 s hasta `alarmResp`; Storage para audios) o servidor en el Worker de Cloudflare.
-4. Más adelante, si quieren alarma con tono propio en iPhone: envolver con Capacitor (app nativa, USD 99/año Apple).
+## Pendiente
+1. Probar la 0.54 en los teléfonos reales: que Franco vea "Revisar avisos" → "Teléfono de Cami" y le mande una alarma con el iPhone bloqueado.
+2. Opcional y gratis: APK de Android para Franco (Capacitor + FCM), con alarma fuerte en pantalla bloqueada. Hay que instalar Java y Android SDK en la Mac. Franco todavía no la pidió.
+3. Opcional: investigar si AlarmKit anda con Apple ID gratis, solo para alarmas programadas.
+- Audios de más de ~1 MB: siguen sin solución gratis (Storage pide Blaze).
 - Ideas: recordatorios con horario para tareas/eventos, aniversarios, modo "llegué bien".
+
+## Entorno en la Mac de Franco
+Repo en `~/twin-particles`; GitHub CLI y Wrangler ya logueados; node instalado (`node --check` funciona).
