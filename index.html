@@ -685,7 +685,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.65';
+const VERSION='beta 0.66';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -2028,7 +2028,7 @@ V.listas=function(){
   const sorted=items.map((x,i)=>[x,i]).sort((a,b)=>(a[0].done||0)-(b[0].done||0));
   $('#items').innerHTML=sorted.length?sorted.map(([x,i])=>`<div class="lc ${x.done?'done':''}" data-o="${i}" role="button" tabindex="0" aria-label="Ver ${esc(x.t)}">
       ${thumbHTML(x,L.kind)}
-      <div class="itxt"><span class="it">${esc(x.t)}</span>${x.meta?`<span class="sub">${esc(x.meta)}</span>`:''}${x.desc?`<span class="desc">${esc(x.desc)}</span>`:''}
+      <div class="itxt"><span class="it">${esc(x.t)}</span>${x.meta?`<span class="sub">${esc(x.meta)}</span>`:''}${x.desc?`<span class="desc">${esc(x.desc)}</span>`:''}${x.stars?`<span class="sub" style="color:#e9a23b">${'★'.repeat(x.stars)}</span>`:''}
         <span class="by">${x.src?`<span class="src">${esc(srcLabel(x))}</span>`:''}<span><span style="color:var(--${x.by==='m'?'a':'b'})">●</span> ${esc(x.by==='m'?meName():S.partner)}</span></span></div>
       <button class="check" data-c="${i}" aria-label="${x.done?'Marcar como pendiente':'Marcar como hecho'}"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></button>
     </div>`).join(''):'<p class="empty" style="padding-top:6px">La lista está vacía. Agreguen lo primero que se les ocurra.</p>';
@@ -2045,9 +2045,12 @@ function itemDetail(L,items,i){
       ${x.desc?`<p style="color:var(--muted)">${esc(x.desc)}</p>`:''}
       <span class="sub">Agregado por ${esc(x.by==='m'?meName():S.partner)}</span>
     </div>
-    ${x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
+    ${L.kind==='place'?placeLinks(x)+`<div class="field"><span class="flabel">Nuestra reseña</span><div class="stars" id="xS">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(x.stars||0)?'on':''}" aria-label="${n} de 5">★</button>`).join('')}</div><textarea class="input" id="xR" rows="2" maxlength="280" placeholder="¿Qué les pareció?">${esc(x.review||'')}</textarea></div>`:x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
     ${L.id==='pelis'&&x.src!=='letterboxd'?`<a class="btn soft full" href="${esc(x.lb||lbSearch(x.t))}" target="_blank" rel="noopener">Ver en Letterboxd</a>`:''}
     <div class="row"><button class="btn soft full" id="dDone">${x.done?'Volver a pendiente':'Marcar como hecho'}</button><button class="btn danger" id="dDel">Quitar</button></div>`,()=>{
+    if(L.kind==='place'){const pushR=()=>{save();hPending=true;if(x.id)netSendSure({type:'listedit',listId:L.id,id:x.id,patch:{stars:x.stars||0,review:x.review||''}})};
+      document.querySelectorAll('#xS button').forEach(b=>b.onclick=()=>{x.stars=+b.dataset.n;document.querySelectorAll('#xS button').forEach(o=>o.classList.toggle('on',+o.dataset.n<=x.stars));vib(10);pushR()});
+      $('#xR').onchange=()=>{x.review=$('#xR').value.trim();pushR()}}
     $('#dDone').onclick=()=>{x.done=x.done?0:1;save();closeSheet();V.listas();if(x.id)netSendSure({type:'listdone',listId:L.id,id:x.id,done:x.done});if(x.done)toast('Hecho')};
     $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Quitado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
   });
@@ -2251,23 +2254,61 @@ function searchCat(listId,q){
     return it;
   });
 }
-const SEARCH_PH={rest:'Buscar restaurante o bar',pelis:'Buscar película, director o año',series:'Buscar serie',yt:'Buscar en YouTube',pod:'Buscar podcast'};
+/* lugares reales: OpenStreetMap, gratis y sin clave. Fotos y reseñas de otras personas solo las
+   da Google con su API paga, así que se abren en Google Maps; las reseñas propias viajan con la lista */
+const PLACE_TAGS=['restaurant','cafe','bar','pub','fast_food','ice_cream','biergarten'];
+const PLACE_NAME={restaurant:'Restaurante',cafe:'Café',bar:'Bar',pub:'Pub',fast_food:'Comida rápida',ice_cream:'Heladería',biergarten:'Cervecería'};
+const CUISINE={steak_house:'Parrilla',pizza:'Pizzería',burger:'Hamburguesas',sushi:'Sushi',italian:'Italiana',argentinian:'Argentina',regional:'Regional',japanese:'Japonesa',chinese:'China',mexican:'Mexicana',peruvian:'Peruana',spanish:'Española',vegetarian:'Vegetariana',vegan:'Vegana',coffee_shop:'Café',ice_cream:'Helados',seafood:'Pescados y mariscos',empanada:'Empanadas',sandwich:'Sándwiches',asian:'Asiática',indian:'India',arab:'Árabe'};
+let nearPos=null;
+const tileFor=(lat,lon,z=17)=>{const n=2**z,x=Math.floor((+lon+180)/360*n),rd=+lat*Math.PI/180,y=Math.floor((1-Math.log(Math.tan(rd)+1/Math.cos(rd))/Math.PI)/2*n);return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`};
+const mapsLink=x=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(x.lat!=null?`${x.t} ${x.addr||x.meta||''}`:x.t+' '+(x.meta||''));
+async function searchPlaces(v){
+  const u=new URL('https://photon.komoot.io/api/');u.searchParams.set('q',v);u.searchParams.set('limit','12');
+  PLACE_TAGS.forEach(t=>u.searchParams.append('osm_tag','amenity:'+t));
+  if(nearPos){u.searchParams.set('lat',nearPos.lat);u.searchParams.set('lon',nearPos.lon)}else u.searchParams.set('bbox','-73.6,-55.1,-53.6,-21.8');
+  const r=await fetch(u);if(!r.ok)throw new Error('sin respuesta');const j=await r.json();const seen={};
+  return (j.features||[]).map(f=>{const p=f.properties||{},c=f.geometry.coordinates;if(!p.name)return null;
+    const addr=[p.street&&(p.street+(p.housenumber?' '+p.housenumber:'')),p.district||p.locality,p.city].filter(Boolean).join(', ');
+    return {t:p.name,meta:[PLACE_NAME[p.osm_value],addr].filter(Boolean).join(' · '),addr,lat:c[1],lon:c[0],osm:(p.osm_type||'N')+p.osm_id,img:tileFor(c[1],c[0]),desc:''}})
+    .filter(x=>x&&!seen[x.osm]&&(seen[x.osm]=1));
+}
+async function placeInfo(it){
+  const r=await fetch('https://nominatim.openstreetmap.org/lookup?format=jsonv2&extratags=1&osm_ids='+encodeURIComponent(it.osm));if(!r.ok)return;
+  const e=((await r.json())[0]||{}).extratags||{};
+  const ig=String(e['contact:instagram']||e.instagram||''),m=ig.match(/instagram\.com\/([\w.]+)/i)||ig.match(/^@?([\w.]+)$/);if(m)it.ig=m[1];
+  const web=e.website||e['contact:website'];if(/^https?:\/\//.test(web||''))it.web=web;
+  const tel=e.phone||e['contact:phone'];if(tel)it.tel=String(tel).split(';')[0].trim();
+  if(e.opening_hours)it.hours=e.opening_hours;
+  if(e.cuisine)it.desc=e.cuisine.split(';').map(c=>CUISINE[c.trim()]||c.trim().replace(/_/g,' ')).join(', ');
+  if(/^https:\/\//.test(e.image||''))it.img=e.image;
+  else if(/^File:/.test(e.wikimedia_commons||''))it.img='https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(e.wikimedia_commons.slice(5))+'?width=800';
+}
+function placeLinks(x){
+  const a=(h,t,soft=true)=>`<a class="btn ${soft?'soft':''} full" href="${esc(h)}" target="_blank" rel="noopener">${esc(t)}</a>`;
+  const ig=x.ig?'https://www.instagram.com/'+x.ig+'/':'https://www.google.com/search?q='+encodeURIComponent(`${x.t} ${x.addr||''} instagram`);
+  return `${x.hours?`<p class="sub">Horarios: ${esc(x.hours)}</p>`:''}${a(mapsLink(x),'Ver fotos, reseñas y cómo llegar',false)}
+    <div class="row">${a(ig,x.ig?'@'+x.ig:'Buscar Instagram')}${x.web?a(x.web,'Sitio web'):''}${x.tel?a('tel:'+x.tel.replace(/[^\d+]/g,''),'Llamar'):''}</div>`;
+}
+const SEARCH_PH={rest:'Buscar restaurante, café o bar',pelis:'Buscar película, director o año',series:'Buscar serie',yt:'Buscar en YouTube',pod:'Buscar podcast'};
 const SEARCH_SRC={rest:'Google Maps',pelis:'una base de datos de películas',series:'una base de datos de series',yt:'YouTube',pod:'Spotify y Apple Podcasts'};
 function addItem(L,items){
   const has=t=>items.some(x=>norm(x.t)===norm(t));
   sheet(`<h2>Agregar a ${L.n}</h2>
     <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input class="input" id="sq" placeholder="${SEARCH_PH[L.id]}" autocomplete="off" enterkeyhint="search" aria-label="${SEARCH_PH[L.id]}"></div>
+    ${L.id==='rest'?`<button class="chip" id="nearB" style="align-self:flex-start">${nearPos?'Buscando cerca tuyo':'Buscar cerca mío'}</button>`:''}
     <div class="results" id="sres"><p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p></div>
     <button class="linkbtn" id="manual" style="align-self:flex-start">¿No aparece? Cargalo a mano</button>
     <div id="mform" hidden style="display:flex;flex-direction:column;gap:14px"></div>
-    <p class="sub">${({pelis:'Busca en Wikipedia.',series:'Busca en Wikipedia y TVMaze.',yt:'Busca en YouTube. También podés pegar el link de un video.',pod:'Busca en Apple Podcasts.',rest:'Si no aparece, cargalo a mano y pegá el link de Google Maps o Instagram.'})[L.id]||''}</p>`,()=>{
+    <p class="sub">${({pelis:'Busca en Wikipedia.',series:'Busca en Wikipedia y TVMaze.',yt:'Busca en YouTube. También podés pegar el link de un video.',pod:'Busca en Apple Podcasts.',rest:'Lugares de OpenStreetMap. Si no aparece, cargalo a mano y pegá el link de Google Maps o Instagram.'})[L.id]||''}</p>`,()=>{
     let res=[],deb,tok=0;
     const q=$('#sq');q.focus();
     const draw=async()=>{
       const v=q.value.trim(),my=++tok;
       if(v.length<2){$('#sres').innerHTML='<p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p>';return}
       let failed=false;
-      if(L.id==='rest')res=searchCat(L.id,v);
+      if(L.id==='rest'){$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';
+        try{res=await searchPlaces(v)}catch(e){failed=true;res=[]}
+        if(my!==tok)return}
       else{$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';
         try{res=await searchRemote(L.id,v)}catch(e){failed=true;res=searchCat(L.id,v)}
         if(my!==tok)return}
@@ -2277,16 +2318,20 @@ function addItem(L,items){
     };
     q.oninput=()=>{clearTimeout(deb);$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';deb=setTimeout(draw,450)};
     q.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(deb);draw()}};
+    $('#nearB')&&($('#nearB').onclick=()=>{const b=$('#nearB');if(!navigator.geolocation)return toast('Este teléfono no da la ubicación');b.textContent='Buscando tu ubicación…';
+      navigator.geolocation.getCurrentPosition(p=>{nearPos={lat:p.coords.latitude,lon:p.coords.longitude};b.textContent='Buscando cerca tuyo';b.classList.add('on');if(q.value.trim().length>1)draw()},()=>{b.textContent='Buscar cerca mío';toast('No se pudo obtener tu ubicación')},{timeout:10000,maximumAge:300000})});
     const preview=x=>{
       const it=Object.assign({by:'m',g:hashStr(x.t),id:uid()},x);
       sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(it,L.kind)}')">${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <span class="label">${[srcLabel(it),it.meta].filter(Boolean).map(esc).join(' · ')}</span>
           <h2>${esc(it.t)}</h2>
-          <p style="color:var(--muted)">${esc(it.desc)}</p>
+          <p style="color:var(--muted)" id="pDesc">${esc(it.desc)}</p>
         </div>
+        ${L.kind==='place'?`<div id="plx" style="display:flex;flex-direction:column;gap:8px">${placeLinks(it)}</div>`:''}
         ${has(it.t)?'<div class="note">Ya está en la lista.</div>':''}
         <div class="row"><button class="btn soft" id="pBack" style="flex:1">Buscar otra</button><button class="btn" id="pAdd" style="flex:2">Agregar a ${L.n}</button></div>`,()=>{
+        if(L.kind==='place'&&it.osm)placeInfo(it).then(()=>{const p=$('#plx');if(!p)return;p.innerHTML=placeLinks(it);$('#pDesc').textContent=it.desc||'';const h=$('.sheet .hero');if(h)h.style.backgroundImage=`url('${coverFor(it,L.kind)}')`}).catch(()=>{});
         $('#pBack').onclick=()=>addItem(L,items);
         $('#pAdd').onclick=()=>{items.unshift(it);save();netSendSure({type:'listadd',listId:L.id,item:it});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
       });
