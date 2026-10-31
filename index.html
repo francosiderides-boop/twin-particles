@@ -664,7 +664,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.60';
+const VERSION='beta 0.61';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -838,11 +838,11 @@ function idbOpen(){
   });
 }
 function setBlob(k,data){
-  blobs[k]=data;
+  blobs[k]=data;clearTimeout(AC.bt);AC.bt=setTimeout(bkPump,3000);
   idbOpen().then(db=>{try{db.transaction('b','readwrite').objectStore('b').put(data,k)}catch(e){}}).catch(()=>{});
 }
 function delBlob(k){
-  delete blobs[k];
+  delete blobs[k];bkBlobDel(k);
   idbOpen().then(db=>{try{db.transaction('b','readwrite').objectStore('b').delete(k)}catch(e){}}).catch(()=>{});
 }
 // las fotos de la cámara pueden pesar varios MB; sin achicarlas, mandarlas
@@ -885,9 +885,10 @@ function loadBlobsFromIDB(){
 }
 // escribir todo el estado es lento: se junta en una sola escritura, y se fuerza al salir de la app
 let saveTO=0;
-function saveNow(){clearTimeout(saveTO);saveTO=0;try{localStorage.setItem('tp-state',JSON.stringify(S))}catch(e){}}
+const AC={uid:null,to:0,last:null,out:false,pumping:0};
+function saveNow(){clearTimeout(saveTO);saveTO=0;if(AC.out)return;try{localStorage.setItem('tp-state',JSON.stringify(S))}catch(e){}if(AC.uid&&!AC.to)AC.to=setTimeout(bkSave,15000)}
 function save(){if(!saveTO)saveTO=setTimeout(saveNow,300)}
-addEventListener('pagehide',saveNow);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&saveTO)saveNow()});
+addEventListener('pagehide',saveNow);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(saveTO)saveNow();if(AC.to)bkSave()}});
 
 /* =========================================================
    RED — vínculo real entre los dos teléfonos (WebRTC vía PeerJS)
@@ -907,15 +908,19 @@ const FBCFG={apiKey:'AIzaSyD6YidJ5nqT7ISRy0CwVOZQLeMfg3NYRgE',authDomain:'twin-p
 const FB={db:null,uid:null,ref:null,ready:false,q:[],started:0,err:null};
 const coupleId=()=>(S.myPeerId&&S.partnerPeerId)?[S.myPeerId,S.partnerPeerId].sort().join('__').replace(/[\/.]/g,'_'):null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('sin conexión'));document.head.appendChild(s)})}
-async function fbStart(){
-  if(FB.started||!S.paired)return;const cid=coupleId();if(!cid)return;FB.started=1;
-  try{
+let fbLoading=null;
+function fbLoad(){return fbLoading=fbLoading||(async()=>{
     const B='https://www.gstatic.com/firebasejs/10.14.1/';
     if(!window.firebase){await loadScript(B+'firebase-app-compat.js');await Promise.all([loadScript(B+'firebase-auth-compat.js'),loadScript(B+'firebase-firestore-compat.js')])}
     if(!firebase.apps.length){firebase.initializeApp(FBCFG);try{await firebase.firestore().enablePersistence({synchronizeTabs:true})}catch(e){}}
+  })().catch(e=>{fbLoading=null;throw e})}
+async function fbStart(){
+  if(FB.started||!S.paired)return;const cid=coupleId();if(!cid)return;FB.started=1;
+  try{
+    await fbLoad();
     const auth=firebase.auth();
     let user=await new Promise(r=>{const u=auth.onAuthStateChanged(x=>{u();r(x)})});
-    if(!user)user=(await auth.signInAnonymously()).user;
+    if(!user){FB.started=0;S.acct=null;saveNow();showLogin();return}
     FB.uid=user.uid;FB.db=firebase.firestore();FB.ref=FB.db.collection('couples').doc(cid);
     const FV=firebase.firestore.FieldValue;
     // una sola escritura sirve para crear la pareja o sumarse (las reglas no dejan entrar a un tercero)
@@ -2761,6 +2766,7 @@ $('#openSettings').onclick=()=>{
    <div class="field"><span class="flabel">Cósmico oscuro</span><div class="swatches">${['nebulosa','aurora','eclipse','abismo'].map(sw).join('')}</div></div>
    <div class="field"><span class="flabel">Claro y suave</span><div class="swatches">${['bruma','rubor','salvia','cielo'].map(sw).join('')}</div></div>
    <div class="field"><div class="swatches" style="grid-template-columns:1fr 3fr;align-items:center">${sw('auto')}<span class="sub">Sigue el modo claro u oscuro de tu teléfono.</span></div></div>
+   <div class="field"><span class="flabel">Cuenta</span><div class="group"><div><span>${esc(S.acct||'Sin mail')}</span><b>Respaldada</b></div></div><button class="btn soft full" id="pOut">Cerrar sesión</button></div>
    <div class="field"><span class="flabel">Avisos</span><div class="group">
      <div><label for="pv">Vibrar con cada aviso</label><input type="checkbox" switch class="sw-t" id="pv" ${S.prefs.vib?'checked':''}></div>
      <div><label for="ps">Sonido de notificación</label><input type="checkbox" switch class="sw-t" id="ps" ${S.prefs.sound?'checked':''}></div>
@@ -2786,13 +2792,14 @@ $('#openSettings').onclick=()=>{
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
     $('#pmine').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
+    $('#pOut').onclick=()=>{closeSheet();setTimeout(logout,230)};
     $('#pAlarm')&&($('#pAlarm').onclick=()=>{closeSheet();go('despertador')});
     $('#pDiag')&&($('#pDiag').onclick=()=>{closeSheet();pushDiag()});
     $('#resendHand')&&($('#resendHand').onclick=()=>{sendMyFont();toast(NET.ready?'Letra reenviada a '+S.partner:'Guardado · se manda sola en cuanto '+S.partner+' se conecte')});
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
-      $('#si').onclick=()=>{const keep={skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
+      $('#si').onclick=()=>{const keep={acct:S.acct,lastUid:S.lastUid,skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
     $('#unpair')&&($('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#si').onclick=()=>{netSend({type:'unpair'});S.paired=false;S.solo=true;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();toast('Desvinculado · seguís como partícula solitaria');go(S.tab)}}));
     $('#pairNow')&&($('#pairNow').onclick=()=>{closeSheet();if(field){field.stop();field=null}showOnboard()});
@@ -3215,6 +3222,113 @@ document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest
 // compartido desde otra app (Android): Spotify → Compartir → Twin Particles
 function checkShare(){const q=new URLSearchParams(location.search),u=spLink([q.get('su'),q.get('sx'),q.get('st')].join(' '));if(!q.has('su')&&!q.has('sx')&&!q.has('st'))return;history.replaceState(null,'',location.pathname);if(u){go('musica');setTimeout(()=>songForm(u),250)}}
 
+/* =========================================================
+   CUENTA Y RESPALDO — con cuenta (Google o mail) el estado y las fotos quedan en
+   users/{uid}: al entrar en otro teléfono o tras borrarse la sesión, vuelve todo.
+   Una cuenta anónima previa se convierte (mismo uid), así no se pierde la pareja.
+   ========================================================= */
+const authReady=()=>new Promise(r=>{const u=firebase.auth().onAuthStateChanged(x=>{u();r(x)})});
+const AUTH_ERR={'auth/invalid-email':'Ese mail no parece válido','auth/weak-password':'La contraseña necesita al menos 6 caracteres','auth/email-already-in-use':'Ya hay una cuenta con ese mail: tocá Entrar','auth/invalid-credential':'Mail o contraseña incorrectos','auth/wrong-password':'Mail o contraseña incorrectos','auth/user-not-found':'No hay una cuenta con ese mail: tocá Crear cuenta','auth/too-many-requests':'Demasiados intentos: probá en unos minutos','auth/network-request-failed':'Sin conexión: revisá internet','auth/popup-blocked':'El teléfono no abrió Google: entrá con tu mail','auth/popup-closed-by-user':'Se cerró la ventana de Google','auth/cancelled-popup-request':'Se cerró la ventana de Google','auth/operation-not-supported-in-this-environment':'Google no abre desde acá: entrá con tu mail','auth/unauthorized-domain':'Google todavía no está habilitado para esta dirección'};
+function showLogin(){
+  $('#main').hidden=true;$('#onboard').hidden=false;
+  $('#onboard').innerHTML=`<div class="ob"><div class="ob-top">${LOGO(34)}</div><div class="ob-panel">
+    <h1>Entrá a tu cuenta</h1><p class="sub">Así todo queda guardado: listas, cuentas, recetas, cartas y fotos vuelven aunque se cierre la sesión o cambies de teléfono.</p>
+    <button class="btn lg full" id="lgG">Continuar con Google</button>
+    <div class="field"><label for="lgM">Mail</label><input class="input" id="lgM" type="email" autocomplete="email" inputmode="email"></div>
+    <div class="field"><label for="lgP">Contraseña</label><input class="input" id="lgP" type="password" autocomplete="current-password"></div>
+    <div class="row"><button class="btn soft" style="flex:1" id="lgIn">Entrar</button><button class="btn soft" style="flex:1" id="lgNew">Crear cuenta</button></div>
+    <button class="linkbtn" id="lgF">Olvidé mi contraseña</button><p class="sub" id="lgE" role="status"></p></div></div>`;
+  const msg=t=>{const e=$('#lgE');if(e)e.textContent=t};
+  const run=async(fn)=>{msg('Un momento…');try{await fbLoad();await authReady();const r=await fn();await afterLogin(r.user,r.switched)}catch(e){msg(AUTH_ERR[e&&e.code]||'No se pudo entrar ('+(e&&(e.code||e.message))+')')}};
+  const creds=()=>[$('#lgM').value.trim(),$('#lgP').value];
+  $('#lgG').onclick=()=>run(async()=>{
+    const a=firebase.auth(),p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
+    if(a.currentUser&&a.currentUser.isAnonymous){
+      try{return{user:(await a.currentUser.linkWithPopup(p)).user}}
+      catch(e){if(e.code==='auth/credential-already-in-use'&&e.credential)return{user:(await a.signInWithCredential(e.credential)).user,switched:true};throw e}
+    }
+    return{user:(await a.signInWithPopup(p)).user,switched:!!(a.currentUser&&a.currentUser.isAnonymous)};
+  });
+  $('#lgIn').onclick=()=>run(async()=>{const[m,w]=creds(),a=firebase.auth(),anon=!!(a.currentUser&&a.currentUser.isAnonymous);return{user:(await a.signInWithEmailAndPassword(m,w)).user,switched:anon}});
+  $('#lgNew').onclick=()=>run(async()=>{const[m,w]=creds(),a=firebase.auth();
+    if(a.currentUser&&a.currentUser.isAnonymous)return{user:(await a.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(m,w))).user};
+    return{user:(await a.createUserWithEmailAndPassword(m,w)).user}});
+  $('#lgF').onclick=async()=>{const m=$('#lgM').value.trim();if(!m){msg('Escribí tu mail arriba y volvé a tocar acá');return}try{await fbLoad();await firebase.auth().sendPasswordResetEmail(m);msg('Te mandamos un mail para cambiarla')}catch(e){msg(AUTH_ERR[e.code]||'No se pudo mandar el mail')}};
+}
+async function afterLogin(user,switched){
+  const local=S.paired||S.solo,other=S.lastUid&&S.lastUid!==user.uid;
+  AC.uid=user.uid;
+  const j=await bkGet('state');
+  if(j&&(!local||switched||other)){
+    let c=null;try{c=JSON.parse(j)}catch(e){}
+    if(c){
+      for(const k of ['tp-font','tp-glyphs','tp-partner-font']){const v=await bkGet(k);if(v)try{localStorage.setItem(k,v)}catch(e){}}
+      c.acct=user.email||'';c.lastUid=user.uid;S=c;saveNow();
+      try{localStorage.setItem('tp-restore','1')}catch(e){}
+      location.reload();return;
+    }
+  }
+  S.acct=user.email||'';S.lastUid=user.uid;saveNow();
+  boot();acctRun();
+}
+// guarda textos largos en partes: un documento de Firestore admite hasta 1 MB
+const bkCol=()=>firebase.firestore().collection('users').doc(AC.uid);
+const PART=700000;
+async function bkGet(name){
+  const d=await bkCol().collection('data').doc(name).get({source:'server'}).catch(()=>null);
+  if(!d||!d.exists)return null;let out='';
+  for(let i=0;i<d.data().n;i++){const p=await bkCol().collection('data').doc(name+'_'+i).get({source:'server'});out+=p.data().s}
+  return out;
+}
+function bkPut(name,str){
+  const b=firebase.firestore().batch(),c=bkCol().collection('data'),n=Math.ceil(str.length/PART);
+  for(let i=0;i<n;i++)b.set(c.doc(name+'_'+i),{s:str.slice(i*PART,(i+1)*PART)});
+  b.set(c.doc(name),{n,u:Date.now()});return b.commit();
+}
+function bkSave(){
+  clearTimeout(AC.to);AC.to=0;if(!AC.uid||AC.out)return Promise.resolve();
+  const j=JSON.stringify(Object.assign({},S,{myPushSub:null}));const ps=[];
+  if(j!==AC.last){AC.last=j;ps.push(bkPut('state',j))}
+  for(const k of ['tp-font','tp-glyphs','tp-partner-font']){let v=null;try{v=localStorage.getItem(k)}catch(e){}if(v&&v!==AC['l'+k]){AC['l'+k]=v;ps.push(bkPut(k,v))}}
+  return Promise.all(ps).catch(()=>{AC.last=null});
+}
+// las fotos de a una, para no trabar la app ni gastar datos de golpe
+const blobId=k=>encodeURIComponent(k).replace(/\./g,'%2E');
+async function bkPump(){
+  if(!AC.uid||AC.pumping||AC.out)return;AC.pumping=1;S.bkDone=S.bkDone||{};
+  try{for(const k of Object.keys(blobs)){
+    if(S.bkDone[k])continue;
+    if(String(blobs[k]).length>1000000){S.bkDone[k]=2;continue} // no entra en un documento
+    await bkCol().collection('blobs').doc(blobId(k)).set({k,d:blobs[k]});S.bkDone[k]=1;save();
+    await new Promise(r=>setTimeout(r,400));
+  }}catch(e){}
+  AC.pumping=0;
+}
+function bkBlobDel(k){if(S.bkDone)delete S.bkDone[k];if(AC.uid)bkCol().collection('blobs').doc(blobId(k)).delete().catch(()=>{})}
+async function acctRun(){
+  try{
+    await fbLoad();const u=await authReady();
+    if(!u||u.isAnonymous){S.acct=null;saveNow();showLogin();return}
+    AC.uid=u.uid;if(S.acct!==(u.email||'')){S.acct=u.email||'';save()}
+    let restore=false;try{restore=!!localStorage.getItem('tp-restore');localStorage.removeItem('tp-restore')}catch(e){}
+    if(restore){
+      S.bkDone=S.bkDone||{};const q=await bkCol().collection('blobs').get();
+      q.forEach(d=>{const x=d.data();S.bkDone[x.k]=1;setBlob(x.k,x.d)});save();
+      if(V[S.tab]&&!$('#main').hidden)V[S.tab]();toast('Tus datos volvieron');
+    }
+    bkSave();bkPump();
+  }catch(e){}
+}
+function logout(){
+  sheet(`<h2>Cerrar sesión</h2><p class="sub">Tus datos quedan en tu cuenta y vuelven al entrar. Las fotos que todavía no se subieron se perderían en este teléfono.</p><button class="btn full" id="loY">Cerrar sesión</button><button class="btn soft full" id="loN">Cancelar</button>`,()=>{
+    $('#loN').onclick=closeSheet;
+    $('#loY').onclick=async()=>{await bkSave();AC.out=true;clearTimeout(saveTO);saveTO=0;try{await firebase.auth().signOut()}catch(e){}
+      ['tp-state','tp-font','tp-glyphs','tp-partner-font','tp-restore'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
+      try{indexedDB.deleteDatabase('tp-blobs')}catch(e){}location.reload()};
+  });
+}
+
+function boot(){
 if(S.paired||S.solo){
   const h=location.hash.slice(1);if(V[h])S.tab=h;
   enterApp();checkShare();
@@ -3226,6 +3340,8 @@ if(S.paired||S.solo){
   // después y no pasa nada si ya está sonando)
   if(location.hash==='#ring'){history.replaceState(null,'',location.pathname);ringIncoming(S.partner,false,false)}
 }else showOnboard();
+}
+if(S.acct!=null&&S.lastUid){boot();acctRun()}else showLogin();
 })();
 </script>
 

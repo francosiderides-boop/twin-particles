@@ -2,6 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{db}/documents {
     function members(cid) { return get(/databases/$(db)/documents/couples/$(cid)).data.members; }
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
     match /couples/{cid} {
       allow read: if request.auth != null && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && request.resource.data.members == [request.auth.uid];
