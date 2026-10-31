@@ -573,8 +573,9 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.56';
+const VERSION='beta 0.57';
 const CHANGELOG=[
+  ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
   ['beta 0.55',['Alarma: botón para hacer sonar su iPhone con Buscar de Apple si no contesta']],
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
@@ -830,7 +831,7 @@ async function fbStart(){
     FB.ref.onSnapshot(snap=>{
       const d=snap.data()||{},subs=d.subs||{},vis=d.vis||{},p=(d.members||[]).find(x=>x!==FB.uid);
       if(p&&subs[p]&&(!S.partnerPushSub||S.partnerPushSub.endpoint!==subs[p].endpoint)){S.partnerPushSub=subs[p];save()}
-      partnerVis=!!(p&&vis[p]&&vis[p].v&&Date.now()-vis[p].t<30000);
+      partnerVis=!!(p&&vis[p]&&vis[p].v);partnerVisT=p&&vis[p]?vis[p].t:0;
       partnerDiag=p&&d.diag&&d.diag[p]||null;
       if(S.myPushSub&&(!subs[FB.uid]||subs[FB.uid].endpoint!==S.myPushSub.endpoint))fbSub(S.myPushSub);
     },e=>{FB.err=String(e.code||e)});
@@ -930,7 +931,7 @@ function handleMsg(d){
     else if(d.type==='beatOn'&&NET.onBeatOn)NET.onBeatOn(d);
     else if(d.type==='beatOff'&&NET.onBeatOff)NET.onBeatOff(d);
     else if(d.type==='felt'&&NET.onFelt)NET.onFelt(d);
-    else if(d.type==='vis')partnerVis=!!d.v;
+    else if(d.type==='vis'){partnerVis=!!d.v;partnerVisT=Date.now()}
     else if(d.type==='alarm'&&NET.onAlarm)NET.onAlarm(d);
     else if(d.type==='alarmResp'&&NET.onAlarmResp)NET.onAlarmResp(d);
     else if(d.type==='letter'&&NET.onLetter)NET.onLetter(d);
@@ -1118,13 +1119,13 @@ async function sendPush(sub,payloadObj){
 let serverRep=0;
 async function relayRepeat(sub,payload){try{const r=await fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({subscription:sub,payload,repeat:{every:6,for:180}})});const j=await r.json();return !!(j&&j.repeat)}catch(e){return false}}
 function relayStop(sub){if(sub&&sub.endpoint)fetch(RELAY_URL,{method:'POST',headers:{'Content-Type':'application/json','x-relay-key':RELAY_KEY},body:JSON.stringify({stop:sub.endpoint})}).catch(()=>{})}
-let partnerVis=false,partnerDiag=null;
+let partnerVis=false,partnerVisT=0,partnerDiag=null;
 function sendVis(){fbVis();if(document.visibilityState==='visible')fbDiag()}
 document.addEventListener('visibilitychange',sendVis);
 function pushPartner(title,body,tag){
   // si tiene la app abierta y conectada ya le llegó en vivo: en iPhone, cada push que no
   // muestra notificación cuenta como falta y Safari termina cortando todas las notificaciones
-  if(tag!=='alarm'&&NET.ready&&partnerVis)return;
+  if(tag!=='alarm'&&NET.ready&&partnerVis&&Date.now()-partnerVisT<30000)return;
   // una vez por día, la dirección de avisos propia viaja también, por si el otro no la tiene
   let sy=takeSync();if(S.myPushSub&&S.subSentDay!==TODAYS&&S.partnerPushSub){sy=[{type:'pushsub',sub:S.myPushSub,mid:uid()}].concat(sy);S.subSentDay=TODAYS;save()}
   if(S.partnerPushSub)sendPush(S.partnerPushSub,{sync:sy,title,body,tag:tag||'tp',url:tag==='alarm'?'./#ring':'./',ttl:tag==='alarm'?600:(tag==='touch'||tag==='beat')?3600:86400}).catch(()=>{});
