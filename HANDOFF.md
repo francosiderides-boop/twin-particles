@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.57
+**Versión actual:** beta 0.58
 
 ## Contexto (resumen del chat anterior)
 - **Quiénes:** Franco (Android, dueño del proyecto) y Cami, su pareja (iPhone 11). Franco escribe en español rioplatense y espera que cada arreglo se publique de verdad (versión nueva + commit + push), probado, no solo explicado. Pide **gastar pocos tokens**.
@@ -34,6 +34,10 @@
 - PeerJS solo para vincularse y como respaldo si Firebase no responde.
 - Fotos: comprimidas (1280 px) viajan dentro del mensaje (límite 1 MB por documento).
 - Pendiente (requiere plan Blaze): Cloud Functions que manden los push y repitan la alarma desde el servidor; Storage para fotos/audios grandes. Se puede desplegar desde Cloud Shell en la consola de Firebase.
+
+## Secciones (desde beta 0.58)
+Barra inferior: Nosotros (partículas, señales, resumen) · Hogar (Tareas, Compras, Cuentas, Agenda) · Comidas (Recetas, Platos) · Ocio (Para ver, Música) · Recuerdos (Álbumes, Cartas). Mapa en `GROUPS`; `S.tab` guarda la vista interna. El despertador quedó en Ajustes (`V.despertador`).
+Datos nuevos en `S.h` y un solo par de mensajes: `hPut`/`hDel` mandan `hset`/`hdel`; al recibir se invierten `by`, `paid` y `mine` (% del gasto que le toca a cada uno). Música: reproductor oficial de Spotify (`open.spotify.com/embed`), sin cuenta de desarrollador: 30 s o tema completo si hay sesión de Spotify en ese navegador; en Android se puede compartir desde Spotify a la app (`share_target`).
 
 ## Arquitectura
 - **Transporte:** ya vinculados, `netSend` → `fbWrite` (Firestore). PeerJS (`netConnectToPartner`, `netWire`) solo para vincularse y como respaldo. Todo lo recibido pasa por `handleMsg`.

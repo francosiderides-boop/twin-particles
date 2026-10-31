@@ -541,6 +541,86 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .mf-cell img{width:100%;height:100%;object-fit:contain;filter:brightness(0) saturate(100%)}
 .mf-cell.empty{background:transparent;border-style:dashed;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--a)}
+/* ===== Hogar, comidas y ocio (beta 0.58) ===== */
+body::before,body::after{content:"";position:fixed;z-index:-1;width:70vmax;height:70vmax;border-radius:50%;filter:blur(70px);opacity:.1;pointer-events:none;animation:ambient 26s ease-in-out infinite alternate}
+body::before{top:-30vmax;left:-25vmax;background:var(--a)}
+body::after{bottom:-35vmax;right:-25vmax;background:var(--b);animation-delay:-13s}
+@keyframes ambient{to{transform:translate(12vmax,10vmax) scale(1.18)}}
+.tabbar nav{grid-template-columns:repeat(5,1fr)}
+.subnav{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;margin-top:14px;padding:4px;border-radius:16px;background:var(--glass-bg);border:1px solid var(--hi2);box-shadow:inset 0 1px 0 var(--hi);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+.subnav i{position:absolute;top:4px;bottom:4px;left:4px;border-radius:12px;background:var(--fg);transition:transform .5s var(--spring);box-shadow:0 6px 16px color-mix(in srgb,var(--fg) 24%,transparent)}
+.subnav button{position:relative;padding:9px 2px;font-size:13px;font-weight:700;color:var(--muted);transition:color .25s;white-space:nowrap}
+.subnav button.on{color:var(--bg)}
+.view.enter.fromR{animation:slideR .42s var(--ease)}
+.view.enter.fromL{animation:slideL .42s var(--ease)}
+@keyframes slideR{from{opacity:0;transform:translateX(26px)}}
+@keyframes slideL{from{opacity:0;transform:translateX(-26px)}}
+.hcard,.gx,.cp,.rc,.dish,.song,.sum{transition:transform .28s var(--spring),box-shadow .25s,opacity .25s}
+.hcard:active,.gx:active,.rc:active,.dish:active,.sum:active{transform:scale(.97)}
+.btn,.chip,.iconbtn{transition:transform .28s var(--spring),background .2s,color .2s,box-shadow .2s}
+.btn:active{transform:scale(.95)}
+.hcard,.gx,.cp,.rc,.song,.sum{background:var(--glass-bg);border:1px solid var(--hi2);box-shadow:inset 0 1px 0 var(--hi),var(--glass-sh);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);border-radius:18px}
+.sums{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.sum{display:flex;flex-direction:column;gap:2px;padding:14px;text-align:left;min-width:0}
+.sum b{font-family:var(--f-display);font-size:20px;letter-spacing:-.02em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sum span{font-size:12px;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hero{position:relative;overflow:hidden;padding:22px 20px;border-radius:24px;color:#fff;background:linear-gradient(rgba(25,15,50,.3),rgba(25,15,50,.3)),linear-gradient(135deg,var(--a),var(--b));background-size:100% 100%,180% 180%;animation:heroMove 12s ease-in-out infinite alternate;box-shadow:0 16px 36px color-mix(in srgb,var(--a) 32%,transparent)}
+.hero,.hero .sub{color:#fff}
+.hero .sub{opacity:.88}
+.hero b{display:block;font-family:var(--f-display);font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin:3px 0;font-variant-numeric:tabular-nums}
+.hero .btn{margin-top:12px;background:rgba(255,255,255,.22);color:#fff;box-shadow:none;padding:10px 15px}
+@keyframes heroMove{to{background-position:0 0,100% 100%}}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:92px 1fr auto;gap:9px;align-items:center;font-size:13px;font-weight:600}
+.bar u{display:block;height:8px;border-radius:9px;background:var(--surface2);overflow:hidden;text-decoration:none}
+.bar u em{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--a),var(--b));transform-origin:left;animation:grow .8s var(--ease) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.gx{display:flex;align-items:center;gap:12px;padding:12px 14px;width:100%;text-align:left}
+.gx .dot{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;flex:none;font-weight:800;color:#fff;background:var(--c,var(--a))}
+.gx div{flex:1;min-width:0}
+.gx .t{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gx .amt{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.glist,.clist{display:flex;flex-direction:column;gap:8px}
+.cp{display:flex;align-items:center;gap:12px;padding:12px 14px;animation:popIn .4s var(--spring)}
+.cp.done{opacity:.55}
+.cp.done .t{text-decoration:line-through}
+.cp .t{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.cp .qty{font-size:12px;font-weight:700;color:var(--muted);padding:2px 8px;border-radius:99px;background:var(--surface2)}
+.cp.done .check{background:var(--ok);border-color:var(--ok)}
+.cp.done .check svg{opacity:1}
+@keyframes popIn{from{opacity:0;transform:scale(.92) translateY(8px)}}
+.prog{height:6px;border-radius:9px;background:var(--surface2);overflow:hidden}
+.prog em{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--a),var(--b));transition:width .6s var(--spring)}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rc{overflow:hidden;text-align:left;display:flex;flex-direction:column;min-width:0}
+.rc .cov{height:104px;display:grid;place-items:center;background:linear-gradient(135deg,var(--c1,var(--a)),var(--c2,var(--b)));background-size:cover;background-position:center;color:#fff;font-family:var(--f-display);font-size:34px;font-weight:600}
+.rc .bd{padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px}
+.rc .bd b{font-size:14px;line-height:1.25}
+.rc .bd span{font-size:12px;color:var(--muted);font-weight:600}
+.dishes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dish{position:relative;aspect-ratio:1;border-radius:18px;overflow:hidden;background:var(--surface2);box-shadow:var(--glass-sh)}
+.dish img{width:100%;height:100%;object-fit:cover;display:block}
+.dish span{position:absolute;inset:auto 0 0 0;padding:26px 10px 9px;text-align:left;color:#fff;font-size:13px;font-weight:700;background:linear-gradient(transparent,rgba(0,0,0,.66))}
+.bigph{width:100%;max-height:48vh;object-fit:cover;border-radius:18px;display:block}
+.stars{display:flex;gap:4px}
+.stars button{font-size:26px;line-height:1;color:var(--line);transition:transform .3s var(--spring),color .2s}
+.stars button.on{color:#e9a23b;transform:scale(1.12)}
+.ings{display:flex;flex-direction:column;gap:6px;padding:0;margin:0;list-style:none}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.song{overflow:hidden;animation:popIn .45s var(--spring)}
+.song .tp{display:flex;gap:12px;align-items:center;padding:12px;width:100%;text-align:left}
+.song img,.song .noimg{width:60px;height:60px;border-radius:13px;object-fit:cover;flex:none;background:linear-gradient(135deg,var(--a),var(--b))}
+.song .tp div{flex:1;min-width:0}
+.song .tp b{display:block;line-height:1.25;overflow-wrap:anywhere}
+.song .note{padding:0 14px 10px;font-size:14px}
+.song iframe{display:block;width:100%;height:152px;border:0;animation:popIn .4s var(--ease)}
+.song .act{display:flex;align-items:center;gap:8px;padding:0 12px 12px}
+.song .play{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:none;background:#1db954;color:#fff;transition:transform .3s var(--spring)}
+.song .play:active{transform:scale(.88)}
+.song .heart{font-size:22px;line-height:1;color:var(--muted);transition:transform .35s var(--spring),color .2s}
+.song .heart.on{color:#e5483d;transform:scale(1.2)}
+.confetti{position:fixed;inset:0;z-index:90;pointer-events:none;width:100%;height:100%}
+.backlink{align-self:flex-start;margin-top:14px;color:var(--muted);font-weight:700;font-size:14px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -559,11 +639,11 @@ input[type=range]{width:100%;accent-color:var(--a)}
     <main id="view"></main>
   </div>
   <div class="tabbar"><nav id="tabs"><span class="tab-blob" id="blob"></span>
-    <button class="tb" data-tab="inicio"><svg viewBox="0 0 24 24"><circle cx="6.5" cy="15" r="2.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M9 14c3-1 4.5-2.5 6-4" stroke-dasharray="2 2.5"/></svg>Señales</button>
-    <button class="tb" data-tab="albumes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>Álbumes</button>
-    <button class="tb" data-tab="listas"><svg viewBox="0 0 24 24"><path d="M9 7h11M9 12h11M9 17h11"/><circle cx="5" cy="7" r="1"/><circle cx="5" cy="12" r="1"/><circle cx="5" cy="17" r="1"/></svg>Listas</button>
-    <button class="tb" data-tab="calendario"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Calendario</button>
-    <button class="tb" data-tab="cartas"><svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="2.5"/><path d="M4 7.5l8 6 8-6"/></svg>Cartas<span class="badge" id="lBadge" hidden></span></button>
+    <button class="tb" data-tab="inicio"><svg viewBox="0 0 24 24"><circle cx="6.5" cy="15" r="2.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M9 14c3-1 4.5-2.5 6-4" stroke-dasharray="2 2.5"/></svg>Nosotros</button>
+    <button class="tb" data-tab="hogar"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Hogar</button>
+    <button class="tb" data-tab="comidas"><svg viewBox="0 0 24 24"><path d="M7 3v7a2 2 0 0 0 2 2v9M5 3v5M9 3v5M17 3c-2 1-3 4-3 7 0 2 1 3 3 3v8"/></svg>Comidas</button>
+    <button class="tb" data-tab="ocio"><svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg>Ocio</button>
+    <button class="tb" data-tab="recuerdos"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>Recuerdos<span class="badge" id="lBadge" hidden></span></button>
   </nav></div>
 </div>
 
@@ -573,7 +653,7 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.57';
+const VERSION='beta 0.58';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -949,6 +1029,8 @@ function handleMsg(d){
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
+    else if(d.type==='hset'&&NET.onHset)NET.onHset(d);
+    else if(d.type==='hdel'&&NET.onHdel)NET.onHdel(d);
     else if(d.type==='state'&&NET.onState)NET.onState(d);
 }
 function netOnStatus(on){
@@ -1408,19 +1490,30 @@ async function genPaper(){
 
 /* navegación */
 const V={};
+const GROUPS={inicio:['inicio'],hogar:['tareas','compras','cuentas','calendario'],comidas:['recetas','platos'],ocio:['listas','musica'],recuerdos:['albumes','cartas']};
+const SUBN={tareas:'Tareas',compras:'Compras',cuentas:'Cuentas',calendario:'Agenda',recetas:'Recetas',platos:'Platos',listas:'Para ver',musica:'Música',albumes:'Álbumes',cartas:'Cartas'};
+const groupOf=v=>Object.keys(GROUPS).find(g=>GROUPS[g].includes(v))||'inicio';
+let slideDir='',subFrom=0;
+function subnavHTML(){const l=GROUPS[groupOf(S.tab)];if(l.length<2)return '';const w=100/l.length;
+  return `<div class="subnav" role="tablist"><i id="subPill" style="width:calc((100% - 8px)/${l.length});transform:translateX(${subFrom*100}%)"></i>${l.map(v=>`<button role="tab" aria-selected="${v===S.tab}" class="${v===S.tab?'on':''}" data-go="${v}">${SUBN[v]}</button>`).join('')}</div>`}
 function go(tab){
-  S.tab=tab;save();
-  document.querySelectorAll('.tb').forEach(b=>{b.classList.toggle('on',b.dataset.tab===tab);b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false')});
+  if(!V[tab])tab='inicio';
+  const grp=groupOf(tab),same=groupOf(S.tab)===grp,from=GROUPS[grp].indexOf(S.tab),to=GROUPS[grp].indexOf(tab);
+  slideDir=same&&from>=0&&to!==from?(to>from?'fromR':'fromL'):'';subFrom=same&&from>=0?from:to;
+  S.tab=tab;if(to>=0){S.sub=S.sub||{};S.sub[grp]=tab}save();
+  document.querySelectorAll('.tb').forEach(b=>{b.classList.toggle('on',b.dataset.tab===grp);b.setAttribute('aria-current',b.dataset.tab===grp?'page':'false')});
   $('#pName').textContent=S.solo?'Sin vincular':S.partner;
   if(field&&tab!=='inicio'){field.stop();field=null}
-  const idx=['inicio','albumes','listas','calendario','cartas'].indexOf(tab),bl=$('#blob');
+  const idx=Object.keys(GROUPS).indexOf(grp),bl=$('#blob');
   if(bl){bl.style.transform=`translateX(${idx*100}%)`;bl.classList.remove('squish');void bl.offsetWidth;bl.classList.add('squish')}
   animNext=true;V[tab]();updateBadge();scrollTo(0,0);
 }
 let animNext=false;
-const STG='.section>*,.lc,.task,.msg,.env,.album,.ev,.ph,.chips>.chip,.cal>*,.letters>*';
+const STG='.section>*,.sum,.gx,.rc,.dish,.lc,.task,.msg,.env,.album,.ev,.ph,.chips>.chip,.cal>*,.letters>*';
 function render(html){
-  const v=$('#view');v.innerHTML=`<div class="view${animNext?' enter':''}">${html}</div>`;
+  const v=$('#view');const si=GROUPS[groupOf(S.tab)].indexOf(S.tab);
+  v.innerHTML=subnavHTML()+`<div class="view${animNext?' enter '+slideDir:''}">${html}</div>`;
+  const pill=$('#subPill');if(pill&&si>=0){if(subFrom===si||!animNext)pill.style.transform=`translateX(${si*100}%)`;else requestAnimationFrame(()=>requestAnimationFrame(()=>{pill.style.transform=`translateX(${si*100}%)`}));subFrom=si}
   if(animNext){let i=0;v.querySelectorAll(STG).forEach(el=>{if(i<18){el.classList.add('stg');el.style.setProperty('--i',i++)}})}
   animNext=false;
 }
@@ -1430,7 +1523,7 @@ document.addEventListener('pointermove',e=>{const c=e.target.closest&&e.target.c
 addEventListener('scroll',()=>{const t=$('.top');if(t)t.classList.toggle('scrolled',scrollY>8)},{passive:true});
 /* pop al tildar */
 document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('.check');if(c){c.classList.remove('popping');void c.offsetWidth;c.classList.add('popping')}},{passive:true});
-document.querySelectorAll('.tb').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+document.querySelectorAll('.tb').forEach(b=>b.onclick=()=>{const g=b.dataset.tab;go(S.sub&&S.sub[g]||GROUPS[g][0])});
 function updateBadge(){const n=S.letters.filter(l=>l.from==='p'&&!l.opened&&!(l.openAt&&l.openAt>TODAYS)).length;const b=$('#lBadge');b.hidden=!n;b.textContent=n}
 
 /* señales */
@@ -1446,6 +1539,7 @@ V.inicio=function(){
       <p class="sub" style="margin-bottom:10px">Estás entrando como partícula solitaria: nada de lo que hagas acá se envía a nadie todavía.</p>
       <button class="btn lg full" id="goPair">Vincularme con mi pareja</button>
     </div>
+    ${homeSummary()}
     <section class="section">
       <div class="sechead"><h2>Señales</h2><span class="label">Se guardan en tu teléfono</span></div>
       <div class="chips" id="sigs"></div>
@@ -1470,6 +1564,7 @@ V.inicio=function(){
     <div class="who r"><span class="label">Spin ↓</span><b style="color:var(--b)">${esc(S.partner)}</b></div>
   </section>
   <button class="touch-hint" id="tHint"><span id="tHintT">Tocá a ${esc(S.partner)} para que su teléfono vibre · mantené para un latido</span></button>
+  ${homeSummary()}
   <section class="section">
     <div class="sechead"><h2>Señales</h2><span class="label">Llegan al instante</span></div>
     <div class="chips" id="sigs"></div>
@@ -1479,11 +1574,8 @@ V.inicio=function(){
     <div class="sechead"><h3>Últimas señales</h3><button class="linkbtn" id="allFeed">Ver todas</button></div>
     <div class="feed" id="feed"></div>
   </section>
-  <section class="section">
-    <div class="sechead"><h2>Despertador</h2><span class="label">A distancia</span></div>
-    <div class="alarm" id="alarm"></div>
-  </section>`);
-  renderSigs();renderFeed();renderAlarm();
+  `);
+  renderSigs();renderFeed();
   $('#customF').onsubmit=e=>{e.preventDefault();send($('#customI').value);$('#customI').value=''};
   $('#allFeed').onclick=()=>sheet(`<h2>Historial de señales</h2><div class="feed">${feedHTML(S.feed)}</div>`);
   readColors();makeField($('#field'),1);bindTouch();
@@ -1857,12 +1949,14 @@ function eventForm(ev){
   });
 }
 let curList='tareas';
+V.tareas=function(){V.listas()};
 V.listas=function(){
+  const inTasks=S.tab==='tareas';curList=inTasks?'tareas':(curList==='tareas'?'pelis':curList);
   const L=LISTS.find(l=>l.id===curList),items=S.lists[curList]=S.lists[curList]||[];
   const pend=items.filter(i=>!i.done).length;
   render(`<section class="section">
-    <div class="sechead"><h2>Pendientes juntos</h2><span class="label">${pend} por hacer</span></div>
-    <div class="tabs" role="tablist">${LISTS.map(l=>`<button class="chip ${l.id===curList?'on':''}" role="tab" aria-selected="${l.id===curList}" data-l="${l.id}">${l.n}<span class="count">${(S.lists[l.id]||[]).filter(i=>!i.done).length}</span></button>`).join('')}</div>
+    <div class="sechead"><h2>${inTasks?'Responsabilidades':'Para disfrutar'}</h2><span class="label">${pend} por hacer</span></div>
+    <div class="tabs" role="tablist" ${inTasks?'hidden':''}>${LISTS.filter(l=>l.kind!=='task').map(l=>`<button class="chip ${l.id===curList?'on':''}" role="tab" aria-selected="${l.id===curList}" data-l="${l.id}">${l.n}<span class="count">${(S.lists[l.id]||[]).filter(i=>!i.done).length}</span></button>`).join('')}</div>
     ${L.kind==='task'?tasksView(L,items):`<button class="btn soft full" id="addI">+ Agregar a ${L.n}</button>
     <div class="lcards" id="items"></div>`}
   </section>`);
@@ -2653,7 +2747,7 @@ $('#openSettings').onclick=()=>{
      <div><label for="pv">Vibrar con cada aviso</label><input type="checkbox" switch class="sw-t" id="pv" ${S.prefs.vib?'checked':''}></div>
      <div><label for="ps">Sonido de notificación</label><input type="checkbox" switch class="sw-t" id="ps" ${S.prefs.sound?'checked':''}></div>
      <div><span>Tono del despertador</span><b>${esc(TONES[S.prefs.tone])}</b></div></div>
-     <button class="btn soft full" id="ptest">Probar notificación</button></div>
+     <button class="btn soft full" id="ptest">Probar notificación</button>${S.paired?'<button class="btn soft full" id="pAlarm">Despertador a distancia</button>':''}</div>
    <div class="field"><span class="flabel">Cartas</span><div class="group">
      <div><span>Tu letra</span><span class="hand-prev" style="${handStyle(S.prefs.hand,S.prefs.ink)}">${S.prefs.hand?esc(HANDS[S.prefs.hand].n):'Sin elegir'}</span></div></div>
      <div class="row"><button class="btn soft" id="phand" style="flex:1">${S.prefs.hand?'Cambiar letra':'Elegir letra'}</button><button class="btn soft" id="pmine" style="flex:1">${HANDS.mine?'Rehacer mi letra':'Crear mi letra'}</button></div>
@@ -2674,6 +2768,7 @@ $('#openSettings').onclick=()=>{
     bindColorPicker();$('#pcAuto').onclick=()=>{S.prefs.myColor=null;save();applySkin();document.querySelectorAll('#pcol [data-pc]').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-pressed',false)})};
     $('#pmine').onclick=()=>{closeSheet();setTimeout(mfOpen,230)};
     $('#phand').onclick=()=>pickHand(()=>$('#openSettings').click());
+    $('#pAlarm')&&($('#pAlarm').onclick=()=>{closeSheet();go('despertador')});
     $('#pDiag')&&($('#pDiag').onclick=()=>{closeSheet();pushDiag()});
     $('#resendHand')&&($('#resendHand').onclick=()=>{sendMyFont();toast(NET.ready?'Letra reenviada a '+S.partner:'Guardado · se manda sola en cuanto '+S.partner+' se conecte')});
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
@@ -2732,7 +2827,7 @@ NET.onListAdd=d=>{
   if(items.some(x=>x.id&&x.id===d.item.id))return;
   const it=Object.assign({},d.item);if(it.blob){setBlob(it.k,it.blob);delete it.blob}
   it.by='p';if(it.who)it.who=flipW(it.who);if(it.doneBy)it.doneBy=flipW(it.doneBy);items.unshift(it);save();entangle();push(S.partner,'agregó algo a una lista');
-  if(S.tab==='listas'&&!$('#main').hidden)V.listas();
+  if((S.tab==='listas'||S.tab==='tareas')&&!$('#main').hidden)V.listas();
 };
 NET.onEventAdd=d=>{
   const ev=Object.assign({},d.ev);if(!ev||!ev.id)return;ev.who=flipW(ev.who);
@@ -2765,19 +2860,19 @@ NET.onListDone=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const x=items.find(i=>i.id===d.id);if(!x)return;
   x.done=d.done;if('doneBy'in d)x.doneBy=flipW(d.doneBy);save();
-  if(S.tab==='listas'&&!$('#main').hidden)V.listas();
+  if((S.tab==='listas'||S.tab==='tareas')&&!$('#main').hidden)V.listas();
 };
 NET.onListDel=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const i=items.findIndex(x=>x.id===d.id);if(i<0)return;
   items.splice(i,1);save();
-  if(S.tab==='listas'&&!$('#main').hidden)V.listas();
+  if((S.tab==='listas'||S.tab==='tareas')&&!$('#main').hidden)V.listas();
 };
 NET.onListEdit=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const x=items.find(i=>i.id===d.id);if(!x)return;
   const pt=Object.assign({},d.patch);if(pt.who)pt.who=flipW(pt.who);Object.assign(x,pt);save();
-  if(S.tab==='listas'&&!$('#main').hidden)V.listas();
+  if((S.tab==='listas'||S.tab==='tareas')&&!$('#main').hidden)V.listas();
 };
 NET.onEventDel=d=>{
   if(!d.id)return;
@@ -2798,9 +2893,264 @@ NET.onUnpair=()=>{
   if(NET.peer)try{NET.peer.destroy()}catch(e){}
   save();toast(S.partner+' te desvinculó');go('inicio');
 };
+/* =========================================================
+   HOGAR, COMIDAS Y OCIO — todo se sincroniza con un solo par de mensajes:
+   hset (crear o editar) y hdel (borrar). Lo relativo a quién es quién se invierte
+   al recibir: by/paid con flipW y mine (el % del gasto que le toca a cada uno).
+   ========================================================= */
+S.h=S.h||{};['gastos','compras','clist','recetas','platos','musica'].forEach(k=>S.h[k]=S.h[k]||[]);
+const HVIEWS={gastos:['cuentas','inicio'],compras:['compras','inicio'],clist:['compras'],recetas:['recetas'],platos:['platos'],musica:['musica','inicio']};
+const onScreen=()=>!$('#main').hidden;
+function hRefresh(col){const a=HVIEWS[col]||[];if(a.includes(S.tab)&&onScreen()&&!$('#scrim')&&V[S.tab])V[S.tab]()}
+function hPut(col,item,note){
+  item.id=item.id||uid();item.u=Date.now();
+  const a=S.h[col],i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);save();
+  if(S.paired){const w=Object.assign({},item);if(w.k&&blobs[w.k]&&i<0)w.blob=blobs[w.k];netSendSure({type:'hset',col,item:w});if(note)pushPartner(note,'','tp')}
+  hRefresh(col);
+}
+function hDel(col,id){S.h[col]=S.h[col].filter(x=>{if(x.id===id&&x.k)delBlob(x.k);return x.id!==id});save();if(S.paired)netSendSure({type:'hdel',col,id});hRefresh(col)}
+NET.onHset=d=>{
+  const a=S.h[d.col];if(!a||!d.item||!d.item.id)return;
+  const it=Object.assign({},d.item),i=a.findIndex(x=>x.id===it.id);
+  if(i>=0&&(a[i].u||0)>(it.u||0))return; // ya hay una edición más nueva
+  if(it.blob){setBlob(it.k,it.blob);delete it.blob}
+  if(it.by)it.by=flipW(it.by);if(it.paid)it.paid=flipW(it.paid);if(it.mine!=null)it.mine=100-it.mine;
+  if(i>=0)a[i]=it;else{a.unshift(it);entangle()}save();hRefresh(d.col);
+};
+NET.onHdel=d=>{const a=S.h[d.col];if(!a)return;S.h[d.col]=a.filter(x=>x.id!==d.id);save();hRefresh(d.col)};
+
+/* festejo chico al terminar algo */
+function confetti(){
+  if(reduce)return;const c=document.createElement('canvas');c.className='confetti';document.body.appendChild(c);
+  const W=c.width=innerWidth,H=c.height=innerHeight,g=c.getContext('2d'),st=getComputedStyle(document.documentElement);
+  const cols=[st.getPropertyValue('--a'),st.getPropertyValue('--b'),'#e9a23b','#3fb877'];
+  const P=Array.from({length:70},()=>({x:W/2,y:H*.55,vx:(Math.random()-.5)*11,vy:-Math.random()*13-4,r:Math.random()*6,s:3+Math.random()*5,c:cols[Math.random()*4|0]}));
+  const t0=performance.now();(function f(t){g.clearRect(0,0,W,H);const k=(t-t0)/1500;if(k>=1){c.remove();return}
+    P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.34;p.vx*=.99;p.r+=.2;g.save();g.translate(p.x,p.y);g.rotate(p.r);g.globalAlpha=1-k;g.fillStyle=p.c;g.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);g.restore()});requestAnimationFrame(f)})(t0);
+  vib([15,40,15]);
+}
+function countUp(el,to,fmt){if(!el)return;if(reduce){el.textContent=fmt(to);return}setTimeout(()=>{if(el.isConnected)el.textContent=fmt(to)},900);const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/700),e=1-Math.pow(1-k,3);el.textContent=fmt(to*e);if(k<1&&el.isConnected)requestAnimationFrame(f)})(t0)}
+const cover=(k,fallback)=>k&&blobs[k]?`style="background-image:url(${blobs[k]})"`:fallback;
+function pickPhoto(cb){const f=document.createElement('input');f.type='file';f.accept='image/*';f.setAttribute('capture','environment');f.onchange=async()=>{const d=f.files[0]&&await compressImage(f.files[0]);if(d)cb(d);else if(f.files[0])toast('No se pudo leer la foto')};f.click()}
+
+/* ---------- Cuentas ---------- */
+const GCATS=[['super','Súper','#3fb877'],['casa','Casa','#3f8fe8'],['servicios','Servicios','#8c6cf0'],['comida','Salidas','#f0607e'],['transporte','Transporte','#e9a23b'],['salud','Salud','#20b2aa'],['otros','Otros','#7d7a92']];
+const gcat=id=>GCATS.find(c=>c[0]===id)||GCATS[6];
+const money=n=>'$ '+Math.round(Math.abs(n)).toLocaleString('es-AR');
+// "1.500,50", "1500.5" o "1500": la última coma o punto seguido de 1-2 cifras son los decimales
+function parseAmt(s){s=String(s||'').trim().replace(/[^\d.,]/g,'');const m=s.match(/^(.*)[.,](\d{1,2})$/);const v=m?parseFloat(m[1].replace(/[.,]/g,'')+'.'+m[2]):parseFloat(s.replace(/[.,]/g,''));return isFinite(v)?v:0}
+// positivo: la pareja te debe a vos; negativo: le debés
+const gBalance=()=>S.h.gastos.reduce((b,g)=>b+(g.paid==='m'?g.amt*(100-g.mine)/100:-g.amt*g.mine/100),0);
+const splitTxt=g=>g.kind==='pago'?'Saldo de cuentas':g.mine===50?'Mitad y mitad':g.mine===100?'Solo de '+meName().toLowerCase():g.mine===0?'Solo de '+S.partner:g.mine+'% vos · '+(100-g.mine)+'% '+S.partner;
+let gMonth=TODAYS.slice(0,7);
+V.cuentas=function(){
+  const bal=gBalance(),even=Math.abs(bal)<1,ms=S.h.gastos.filter(g=>g.date.slice(0,7)===gMonth&&g.kind!=='pago').sort((a,b)=>b.date.localeCompare(a.date)||b.u-a.u);
+  const pagos=S.h.gastos.filter(g=>g.date.slice(0,7)===gMonth&&g.kind==='pago');
+  const total=ms.reduce((t,g)=>t+g.amt,0),byCat=GCATS.map(c=>[c,ms.filter(g=>gcat(g.cat)===c).reduce((t,g)=>t+g.amt,0)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+  const [y,m]=gMonth.split('-').map(Number);
+  render(`<section class="section"><div class="hero">
+      <span class="sub">${even?'Están a mano':bal>0?S.partner+' te debe':'Le debés a '+esc(S.partner)}</span><b id="gBal">${money(0)}</b>
+      <span class="sub">${even?'Ninguno le debe nada al otro':'Según lo que anotaron hasta hoy'}</span>
+      ${even?'':'<br><button class="btn" id="gSettle">Saldar cuentas</button>'}
+    </div>
+    <button class="btn lg full" id="gAdd">Anotar un gasto</button></section>
+    <section class="section"><div class="sechead"><div class="row" style="align-items:center"><button class="iconbtn" id="gPrev" aria-label="Mes anterior">‹</button><h3 style="margin:0;text-transform:capitalize">${MES[m-1]} ${y}</h3><button class="iconbtn" id="gNext" aria-label="Mes siguiente" ${gMonth>=TODAYS.slice(0,7)?'disabled style="opacity:.3"':''}>›</button></div><span class="label">${money(total)}</span></div>
+    ${byCat.length?`<div class="bars">${byCat.map(([c,v])=>`<div class="bar"><span>${c[1]}</span><u><em style="width:${Math.max(4,v/byCat[0][1]*100)}%"></em></u><span>${money(v)}</span></div>`).join('')}</div>`:''}
+    <div class="glist">${ms.concat(pagos).map(g=>{const c=gcat(g.cat);return `<button class="gx" data-g="${g.id}"><span class="dot" style="--c:${g.kind==='pago'?'var(--ok)':c[2]}">${g.kind==='pago'?'✓':esc(c[1][0])}</span><div><span class="t">${esc(g.t)}</span><span class="sub">${g.paid==='m'?'Pagaste vos':'Pagó '+esc(S.partner)} · ${splitTxt(g)} · ${fmtD(g.date)}</span></div><span class="amt">${money(g.amt)}</span></button>`}).join('')||'<p class="empty">Nada anotado este mes. Sumen el primer gasto y la app hace las cuentas.</p>'}</div></section>`);
+  countUp($('#gBal'),Math.abs(bal),money);
+  $('#gAdd').onclick=()=>gastoForm();
+  const shift=n=>{const d=new Date(y,m-1+n,1);gMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');V.cuentas()};
+  $('#gPrev').onclick=()=>shift(-1);$('#gNext').onclick=()=>{if(gMonth<TODAYS.slice(0,7))shift(1)};
+  $('#gSettle')&&($('#gSettle').onclick=()=>{const b=gBalance();sheet(`<h2>Saldar cuentas</h2><p class="sub">${b>0?esc(S.partner)+' te paga':'Le pagás a '+esc(S.partner)} <b>${money(b)}</b> y quedan a mano. Lo ya anotado no se borra.</p><button class="btn full" id="sOkG">Marcar como saldado</button>`,()=>$('#sOkG').onclick=()=>{hPut('gastos',{kind:'pago',t:'Saldaron cuentas',amt:Math.abs(b),paid:b>0?'p':'m',mine:b>0?100:0,cat:'otros',date:TODAYS,by:'m'},'Saldó las cuentas');closeSheet();confetti()})});
+  document.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>gastoForm(S.h.gastos.find(g=>g.id===b.dataset.g)));
+};
+function gastoForm(g){
+  const e=g||{cat:'super',paid:'m',mine:50,date:TODAYS};
+  const modes=[[50,'Mitad'],[100,'Solo mío'],[0,'Solo de '+S.partner]];
+  sheet(`<h2>${g?'Editar gasto':'Nuevo gasto'}</h2>
+    <div class="field"><label for="gA">Monto</label><input class="input" id="gA" inputmode="decimal" placeholder="$ 0" value="${g?String(g.amt).replace('.',','):''}" style="font-size:24px;font-weight:700"></div>
+    <div class="field"><label for="gT">¿En qué?</label><input class="input" id="gT" maxlength="60" placeholder="Súper, luz, alquiler…" value="${esc(e.t||'')}"></div>
+    <div class="field"><span class="flabel">Categoría</span><div class="chips" id="gC">${GCATS.map(c=>`<button class="chip ${c[0]===e.cat?'on':''}" data-v="${c[0]}" type="button">${c[1]}</button>`).join('')}</div></div>
+    <div class="field"><span class="flabel">¿Quién pagó?</span><div class="seg" id="gP"><button type="button" data-v="m" class="${e.paid==='m'?'on':''}">Vos</button><button type="button" data-v="p" class="${e.paid==='p'?'on':''}">${esc(S.partner)}</button></div></div>
+    <div class="field"><span class="flabel">¿Cómo lo dividen?</span><div class="chips" id="gM">${modes.map(x=>`<button class="chip" data-v="${x[0]}" type="button">${esc(x[1])}</button>`).join('')}</div>
+      <input type="range" id="gR" min="0" max="100" step="5" value="${e.mine}" aria-label="Tu parte" style="width:100%;accent-color:var(--a)"><span class="sub" id="gS"></span></div>
+    <div class="field"><label for="gD">Fecha</label><input class="input" type="date" id="gD" value="${e.date}" max="${TODAYS}"></div>
+    <button class="btn full" id="gOk">${g?'Guardar':'Anotar'}</button>${g?'<button class="btn danger full" id="gX">Borrar</button>':''}`,()=>{
+    let cat=e.cat,paid=e.paid;
+    const upd=()=>{const v=+$('#gR').value,a=parseAmt($('#gA').value);$('#gS').textContent=`Vos ${v}%${a?' ('+money(a*v/100)+')':''} · ${S.partner} ${100-v}%${a?' ('+money(a*(100-v)/100)+')':''}`;document.querySelectorAll('#gM .chip').forEach(b=>b.classList.toggle('on',+b.dataset.v===v))};
+    document.querySelectorAll('#gC .chip').forEach(b=>b.onclick=()=>{cat=b.dataset.v;document.querySelectorAll('#gC .chip').forEach(x=>x.classList.toggle('on',x===b))});
+    document.querySelectorAll('#gP button').forEach(b=>b.onclick=()=>{paid=b.dataset.v;document.querySelectorAll('#gP button').forEach(x=>x.classList.toggle('on',x===b))});
+    document.querySelectorAll('#gM .chip').forEach(b=>b.onclick=()=>{$('#gR').value=b.dataset.v;upd()});
+    $('#gR').oninput=upd;$('#gA').oninput=upd;upd();
+    $('#gOk').onclick=()=>{const amt=parseAmt($('#gA').value);if(!amt){toast('Poné el monto');$('#gA').focus();return}
+      const t=$('#gT').value.trim()||gcat(cat)[1],mine=+$('#gR').value,date=$('#gD').value||TODAYS;closeSheet();hPut('gastos',Object.assign({},g||{by:'m'},{t,amt,cat,paid,mine,date}),g?null:'Anotó un gasto: '+t);vib(15)};
+    $('#gX')&&($('#gX').onclick=()=>{closeSheet();hDel('gastos',g.id);toast('Gasto borrado')});
+  });
+}
+
+/* ---------- Compras ---------- */
+const CDEF=[{id:'super',n:'Súper'},{id:'verdu',n:'Verdulería'},{id:'farma',n:'Farmacia'}];
+const cLists=()=>CDEF.concat(S.h.clist);
+let cList='super';
+V.compras=function(){
+  if(!cLists().some(l=>l.id===cList))cList='super';
+  const all=S.h.compras.filter(x=>x.list===cList),pend=all.filter(x=>!x.done),done=all.filter(x=>x.done);
+  const row=x=>`<div class="cp ${x.done?'done':''}"><button class="check" data-t="${x.id}" aria-label="${x.done?'Volver a la lista':'Marcar como comprado'}"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></button><span class="t">${esc(x.t)}</span>${x.qty?`<span class="qty">${esc(x.qty)}</span>`:''}<button class="linkbtn" data-d="${x.id}" aria-label="Borrar ${esc(x.t)}">✕</button></div>`;
+  render(`<section class="section"><div class="sechead"><h2>Lista de compras</h2><span class="label">${pend.length?pend.length+' por comprar':'Todo comprado'}</span></div>
+    <div class="tabs">${cLists().map(l=>`<button class="chip ${l.id===cList?'on':''}" data-cl="${l.id}">${esc(l.n)}<span class="count">${S.h.compras.filter(x=>x.list===l.id&&!x.done).length||''}</span></button>`).join('')}<button class="chip add" id="cNew">+ Lista</button></div>
+    ${all.length?`<div class="prog"><em style="width:${done.length/all.length*100}%"></em></div>`:''}
+    <form class="row" id="cF"><input class="input" id="cI" maxlength="60" placeholder="Agregar a ${esc(cLists().find(l=>l.id===cList).n)}" autocomplete="off" aria-label="Producto"><input class="input" id="cQ" maxlength="10" placeholder="Cant." style="flex:0 0 70px" aria-label="Cantidad"><button class="btn" aria-label="Agregar">+</button></form>
+    <div class="clist">${pend.map(row).join('')||(done.length?'':'<p class="empty">Vacía. Lo que anote uno le aparece al otro al instante.</p>')}</div>
+    ${done.length?`<div class="sechead"><h3>En el carrito</h3><button class="linkbtn" id="cClear">Vaciar</button></div><div class="clist">${done.map(row).join('')}</div>`:''}
+    ${cList!=='super'&&cList!=='verdu'&&cList!=='farma'?'<button class="btn danger full" id="cDelL">Borrar esta lista</button>':''}</section>`);
+  document.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>{cList=b.dataset.cl;V.compras()});
+  $('#cF').onsubmit=e=>{e.preventDefault();const t=$('#cI').value.trim();if(!t)return;const q=$('#cQ').value.trim();hPut('compras',{list:cList,t,qty:q,by:'m'},'Agregó a compras: '+t);vib(12);const i=$('#cI');i&&i.focus()};
+  document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{const x=S.h.compras.find(i=>i.id===b.dataset.t);if(!x)return;x.done=x.done?0:1;hPut('compras',x);vib(12);if(x.done&&!S.h.compras.some(i=>i.list===x.list&&!i.done))confetti()});
+  document.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>hDel('compras',b.dataset.d));
+  $('#cClear')&&($('#cClear').onclick=()=>done.forEach(x=>hDel('compras',x.id)));
+  $('#cNew').onclick=()=>sheet(`<h2>Nueva lista</h2><div class="field"><label for="cN">Nombre</label><input class="input" id="cN" maxlength="24" placeholder="Ferretería, regalos…"></div><button class="btn full" id="cNO">Crear</button>`,()=>$('#cNO').onclick=()=>{const n=$('#cN').value.trim();if(!n)return;closeSheet();const id=uid();cList=id;hPut('clist',{id,n,by:'m'})});
+  $('#cDelL')&&($('#cDelL').onclick=()=>{S.h.compras.filter(x=>x.list===cList).forEach(x=>hDel('compras',x.id));hDel('clist',cList);cList='super';V.compras()});
+};
+
+/* ---------- Recetas ---------- */
+const RIDEAS=[
+ ['Milanesas al horno','40 min',['4 milanesas de carne o pollo','Aceite','1 limón','Ensalada para acompañar'],['Prendé el horno fuerte y aceitá una placa.','Cociná las milanesas 12 minutos de cada lado, hasta que doren.','Serví con limón y ensalada.']],
+ ['Tarta de verduras','50 min',['1 tapa de tarta','1 paquete de acelga o espinaca','1 cebolla','2 huevos','100 g de queso'],['Rehogá la cebolla y sumá la verdura picada.','Mezclá con huevos y queso.','Rellená la tapa y horneá 30 minutos.']],
+ ['Guiso de lentejas','1 h',['300 g de lentejas','1 cebolla','1 morrón','1 zanahoria','1 chorizo colorado','Puré de tomate'],['Rehogá las verduras picadas con el chorizo.','Sumá las lentejas, el tomate y agua hasta cubrir.','Cociná a fuego bajo 40 minutos, revolviendo.']],
+ ['Pollo al limón con papas','1 h',['4 presas de pollo','4 papas','2 limones','Ajo y romero'],['Cortá las papas y ponelas en una fuente con el pollo.','Agregá jugo de limón, ajo, romero, aceite y sal.','Horneá 50 minutos, dando vuelta una vez.']],
+ ['Wok de verduras y arroz','25 min',['1 taza de arroz','1 morrón','1 zanahoria','1 zucchini','Salsa de soja'],['Cociná el arroz.','Saltá las verduras en tiras a fuego fuerte.','Sumá el arroz y la soja, y mezclá 2 minutos.']],
+ ['Tacos de carne','30 min',['500 g de carne picada','8 tortillas','1 cebolla','Tomate y palta','Comino y pimentón'],['Dorá la cebolla con la carne y los condimentos.','Calentá las tortillas en una sartén.','Armá los tacos con tomate y palta.']],
+ ['Shakshuka','25 min',['4 huevos','1 lata de tomate','1 cebolla','1 morrón','Comino y pimentón'],['Rehogá cebolla y morrón con las especias.','Sumá el tomate y cociná 10 minutos.','Abrí huequitos, poné los huevos y tapá hasta que cuajen.']],
+ ['Fideos con pesto','20 min',['400 g de fideos','1 atado de albahaca','Nueces','Queso rallado','Aceite de oliva'],['Procesá albahaca, nueces, queso y aceite.','Hervé los fideos.','Mezclá con el pesto y un poco del agua de cocción.']],
+ ['Risotto de hongos','40 min',['300 g de arroz carnaroli','200 g de hongos','1 cebolla','1 l de caldo','Queso rallado'],['Rehogá cebolla y hongos.','Nacará el arroz y sumá caldo de a poco, revolviendo 18 minutos.','Apagá el fuego y mezclá con queso.']],
+ ['Ensalada César','15 min',['1 lechuga','1 pechuga de pollo','Pan tostado','Queso rallado','Mayonesa, limón y mostaza'],['Cociná el pollo a la plancha y cortalo.','Prepará el aderezo con mayonesa, limón y mostaza.','Mezclá todo con la lechuga, el pan y el queso.']],
+ ['Panqueques','20 min',['2 huevos','1 taza de harina','1 taza y media de leche','Dulce de leche'],['Licuá huevos, harina y leche.','Cociná de a uno en una sartén enmantecada.','Rellená con dulce de leche.']],
+ ['Brownies','45 min',['200 g de chocolate','150 g de manteca','200 g de azúcar','3 huevos','100 g de harina'],['Derretí chocolate y manteca.','Sumá azúcar, huevos y harina.','Horneá 25 minutos a fuego medio.']]
+].map((r,i)=>({id:'idea'+i,t:r[0],time:r[1],ing:r[2],steps:r[3]}));
+const RCOL=[['#f0607e','#e9a23b'],['#3fb877','#20b2aa'],['#8c6cf0','#3f8fe8'],['#e9a23b','#e5483d']];
+let rTab='nuestras',rQ='';
+V.recetas=function(){
+  const own=S.h.recetas,base=rTab==='nuestras'?own:RIDEAS.filter(r=>!own.some(o=>o.id===r.id));
+  const list=base.filter(r=>!rQ||(r.t+' '+(r.ing||[]).join(' ')).toLowerCase().includes(rQ.toLowerCase()));
+  render(`<section class="section"><div class="sechead"><h2>Recetas</h2><button class="linkbtn" id="rAdd">+ Nueva</button></div>
+    <div class="seg" id="rSeg"><button data-v="nuestras" class="${rTab==='nuestras'?'on':''}">Nuestras (${own.length})</button><button data-v="ideas" class="${rTab==='ideas'?'on':''}">Ideas para probar</button></div>
+    <input class="input" id="rS" placeholder="Buscar por plato o ingrediente" value="${esc(rQ)}" aria-label="Buscar receta">
+    <div class="rgrid" id="rG"></div></section>`);
+  $('#rG').innerHTML=list.map((r,i)=>{const c=RCOL[i%4];return `<button class="rc" data-r="${r.id}"><span class="cov" ${cover(r.k,`style="--c1:${c[0]};--c2:${c[1]}"`)}>${r.k&&blobs[r.k]?'':esc(r.t[0])}</span><span class="bd"><b>${esc(r.t)}</b><span>${esc(r.time||'')}</span></span></button>`}).join('')||`<p class="empty" style="grid-column:1/-1">${rQ?'No hay recetas con eso.':'Todavía no guardaron ninguna. Elijan de "Ideas para probar" o sumen la suya.'}</p>`;
+  document.querySelectorAll('#rSeg button').forEach(b=>b.onclick=()=>{rTab=b.dataset.v;V.recetas()});
+  $('#rS').oninput=e=>{rQ=e.target.value;const p=e.target.selectionStart;V.recetas();const n=$('#rS');n.focus();n.setSelectionRange(p,p)};
+  $('#rAdd').onclick=()=>recetaForm();
+  document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>recetaView(own.find(x=>x.id===b.dataset.r)||RIDEAS.find(x=>x.id===b.dataset.r)));
+};
+function recetaView(r){
+  const mine=S.h.recetas.some(x=>x.id===r.id);
+  sheet(`${r.k&&blobs[r.k]?`<img class="bigph" src="${blobs[r.k]}" alt="">`:''}<h2>${esc(r.t)}</h2>${r.time?`<span class="label">${esc(r.time)}</span>`:''}
+    <div class="field"><span class="flabel">Ingredientes</span><ul class="ings">${(r.ing||[]).map(i=>`<li>• ${esc(i)}</li>`).join('')}</ul></div>
+    <div class="field"><span class="flabel">Cómo se hace</span><ol class="steps">${(r.steps||[]).map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div>
+    ${r.ing&&r.ing.length?'<button class="btn full" id="rBuy">Sumar ingredientes a Compras</button>':''}
+    ${mine?'<div class="row"><button class="btn soft" style="flex:1" id="rEd">Editar</button><button class="btn danger" style="flex:1" id="rDel">Borrar</button></div>':'<button class="btn soft full" id="rSave">Guardar en Nuestras</button>'}`,()=>{
+    $('#rBuy')&&($('#rBuy').onclick=()=>{r.ing.forEach(t=>{if(!S.h.compras.some(x=>x.list==='super'&&!x.done&&x.t===t))hPut('compras',{list:'super',t,by:'m'})});if(S.paired)pushPartner('Sumó a compras lo de '+r.t,'','tp');closeSheet();cList='super';toast('Ingredientes en la lista del súper','Ver',()=>go('compras'));confetti()});
+    $('#rSave')&&($('#rSave').onclick=()=>{closeSheet();hPut('recetas',Object.assign({by:'m'},r),'Guardó una receta: '+r.t);rTab='nuestras';toast('Guardada');V.recetas()});
+    $('#rEd')&&($('#rEd').onclick=()=>{closeSheet();setTimeout(()=>recetaForm(r),230)});
+    $('#rDel')&&($('#rDel').onclick=()=>{closeSheet();hDel('recetas',r.id)});
+  });
+}
+function recetaForm(r){
+  let ph=null;
+  sheet(`<h2>${r?'Editar receta':'Nueva receta'}</h2>
+    <div class="field"><label for="fT">Nombre</label><input class="input" id="fT" maxlength="60" value="${esc(r?r.t:'')}"></div>
+    <div class="field"><label for="fM">Tiempo</label><input class="input" id="fM" maxlength="20" placeholder="30 min" value="${esc(r?r.time||'':'')}"></div>
+    <div class="field"><label for="fI">Ingredientes (uno por renglón)</label><textarea class="input" id="fI" rows="5">${esc(r?(r.ing||[]).join('\n'):'')}</textarea></div>
+    <div class="field"><label for="fS">Pasos (uno por renglón)</label><textarea class="input" id="fS" rows="5">${esc(r?(r.steps||[]).join('\n'):'')}</textarea></div>
+    <button class="btn soft full" id="fP">Sacar o elegir foto</button><button class="btn full" id="fO">Guardar</button>`,()=>{
+    $('#fP').onclick=()=>pickPhoto(d=>{ph=d;$('#fP').textContent='Foto lista ✓'});
+    $('#fO').onclick=()=>{const t=$('#fT').value.trim();if(!t){toast('Ponele un nombre');return}
+      const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean),it=Object.assign({by:'m'},r||{},{t,time:$('#fM').value.trim(),ing:lines('#fI'),steps:lines('#fS')});
+      if(ph){it.k='rec_'+uid();setBlob(it.k,ph);if(r&&r.k)delBlob(r.k)}
+      closeSheet();rTab='nuestras';hPut('recetas',it,r?null:'Sumó una receta: '+t);if(ph&&r&&S.paired)netSendSure({type:'hset',col:'recetas',item:Object.assign({},it,{blob:ph})})};
+  });
+}
+
+/* ---------- Platos ---------- */
+V.platos=function(){
+  render(`<section class="section"><div class="sechead"><h2>Nuestros platos</h2><span class="label">${S.h.platos.length||''}</span></div>
+    <button class="btn lg full" id="dNew">Sacarle una foto a un plato</button>
+    <div class="dishes">${S.h.platos.map(d=>`<button class="dish" data-p="${d.id}" aria-label="${esc(d.n)}">${blobs[d.k]?`<img src="${blobs[d.k]}" alt="" loading="lazy">`:''}<span>${esc(d.n)}${d.stars?' · '+'★'.repeat(d.stars):''}</span></button>`).join('')}</div>
+    ${S.h.platos.length?'':'<p class="empty">Guarden acá lo que cocinan o lo que comen afuera, para acordarse y repetir.</p>'}</section>`);
+  $('#dNew').onclick=()=>pickPhoto(platoForm);
+  document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>platoView(S.h.platos.find(x=>x.id===b.dataset.p)));
+};
+function platoForm(photo){
+  let st=0;
+  sheet(`<img class="bigph" src="${photo}" alt=""><div class="field"><label for="dN">¿Qué es?</label><input class="input" id="dN" maxlength="50" placeholder="Ñoquis del domingo"></div>
+    <div class="field"><span class="flabel">¿Qué tal estuvo?</span><div class="stars" id="dS">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" aria-label="${n} de 5">★</button>`).join('')}</div></div>
+    <div class="field"><label for="dT">Nota</label><input class="input" id="dT" maxlength="120" placeholder="Le faltó sal, repetir"></div><button class="btn full" id="dO">Guardar plato</button>`,()=>{
+    document.querySelectorAll('#dS button').forEach(b=>b.onclick=()=>{st=+b.dataset.n;document.querySelectorAll('#dS button').forEach(x=>x.classList.toggle('on',+x.dataset.n<=st));vib(10)});
+    $('#dO').onclick=()=>{const n=$('#dN').value.trim()||'Plato sin nombre',k='dish_'+uid(),note=$('#dT').value.trim();setBlob(k,photo);closeSheet();hPut('platos',{k,n,note,stars:st,date:TODAYS,by:'m'},'Guardó un plato: '+n);confetti()};
+  });
+}
+function platoView(d){
+  sheet(`${blobs[d.k]?`<img class="bigph" src="${blobs[d.k]}" alt="">`:''}<h2>${esc(d.n)}</h2><span class="label">${d.stars?'★'.repeat(d.stars)+' · ':''}${fmtLong(d.date)}${d.by==='p'?' · '+esc(S.partner):''}</span>${d.note?`<p>${esc(d.note)}</p>`:''}
+    <button class="btn soft full" id="dR">Guardar como receta</button><button class="btn danger full" id="dX">Borrar</button>`,()=>{
+    $('#dR').onclick=()=>{closeSheet();setTimeout(()=>recetaForm(),230)};
+    $('#dX').onclick=()=>{closeSheet();hDel('platos',d.id)};
+  });
+}
+
+/* ---------- Música ---------- */
+// la app no pide cuenta de Spotify: usa su reproductor oficial, que da 30 s, o el tema completo si ya hay sesión de Spotify en ese navegador
+const spParse=s=>{const m=String(s||'').match(/(?:open\.spotify\.com\/(?:intl-[a-z-]+\/)?|spotify:)(track|album|playlist|episode|show|artist)[\/:]([A-Za-z0-9]+)/);return m?{kind:m[1],sp:m[2]}:null};
+const spLink=s=>{const m=String(s||'').match(/(https?:\/\/(?:open\.spotify\.com|spotify\.link)\/\S+|spotify:[a-z]+:[A-Za-z0-9]+)/);return m?m[1]:''};
+async function spInfo(url){
+  let p=spParse(url),o=null;
+  try{const u=p?`https://open.spotify.com/${p.kind}/${p.sp}`:url;const r=await fetch('https://open.spotify.com/oembed?url='+encodeURIComponent(u));if(r.ok)o=await r.json()}catch(e){}
+  if(!p&&o&&o.iframe_url)p=spParse(o.iframe_url.replace('/embed/','/'));
+  return p?Object.assign(p,{title:o&&o.title||'',img:o&&o.thumbnail_url||''}):null;
+}
+const sendSong=async(url,note)=>{toast('Buscando en Spotify…');const i=await spInfo(url);if(!i){toast('Ese link no parece de Spotify');return false}
+  hPut('musica',{sp:i.sp,kind:i.kind,title:i.title||'Canción de Spotify',img:i.img,note,by:'m',date:TODAYS},'Te mandó una canción'+(i.title?': '+i.title:''));toast(S.paired?'Enviada a '+S.partner:'Guardada');confetti();return true};
+function songForm(pre){
+  sheet(`<h2>Mandar una canción</h2><p class="sub">En Spotify tocá <b>Compartir → Copiar enlace</b> y pegalo acá.</p>
+    <div class="field"><label for="mU">Link de Spotify</label><div class="row"><input class="input" id="mU" placeholder="https://open.spotify.com/track/…" value="${esc(pre||'')}" autocomplete="off"><button class="btn soft" id="mP" type="button">Pegar</button></div></div>
+    <div class="field"><label for="mN">Unas palabras (opcional)</label><input class="input" id="mN" maxlength="120" placeholder="Me acordé de vos"></div>
+    <button class="btn full" id="mO">Enviar</button><a class="btn soft full" href="https://open.spotify.com/" target="_blank" rel="noopener">Abrir Spotify</a>`,()=>{
+    $('#mP').onclick=async()=>{try{$('#mU').value=await navigator.clipboard.readText()}catch(e){toast('Mantené apretado el campo y elegí Pegar');$('#mU').focus()}};
+    $('#mO').onclick=async()=>{const u=spLink($('#mU').value);if(!u){toast('Ese link no parece de Spotify');return}const n=$('#mN').value.trim();if(await sendSong(u,n)){closeSheet();if(S.tab==='musica')V.musica()}};
+  });
+}
+const SP_PLAY='<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+V.musica=function(){
+  render(`<section class="section"><div class="sechead"><h2>Canciones</h2><span class="label">Con Spotify</span></div>
+    <button class="btn lg full" id="mNew">Mandar una canción</button>
+    <div class="clist" id="mL">${S.h.musica.map(s=>`<article class="song" data-s="${s.id}"><div class="tp">${s.img?`<img src="${esc(s.img)}" alt="" loading="lazy">`:'<span class="noimg"></span>'}<div><b>${esc(s.title)}</b><span class="sub">${s.by==='m'?'Mandaste vos':'De '+esc(S.partner)} · ${fmtD(s.date)}${s.heard?' · Escuchada':''}</span></div></div>
+      ${s.note?`<p class="note">${esc(s.note)}</p>`:''}<div class="act"><button class="play" data-pl="${s.id}" aria-label="Escuchar">${SP_PLAY}</button><button class="heart ${s.love?'on':''}" data-lv="${s.id}" aria-label="Me encanta">♥</button><span style="flex:1"></span><a class="linkbtn" href="https://open.spotify.com/${esc(s.kind)}/${esc(s.sp)}" target="_blank" rel="noopener">Abrir en Spotify</a><button class="linkbtn" data-sx="${s.id}" aria-label="Borrar">✕</button></div></article>`).join('')||'<p class="empty">Todavía no se mandaron nada. La primera canción la elegís vos.</p>'}</div></section>`);
+  $('#mNew').onclick=()=>songForm();
+  document.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>{const s=S.h.musica.find(x=>x.id===b.dataset.pl),el=b.closest('.song');
+    if(!el.querySelector('iframe')){const f=document.createElement('iframe');f.src=`https://open.spotify.com/embed/${encodeURIComponent(s.kind)}/${encodeURIComponent(s.sp)}?utm_source=oembed`;f.allow='autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture';f.loading='lazy';f.title=s.title;el.querySelector('.act').before(f)}
+    if(s.by==='p'&&!s.heard){s.heard=1;s.u=Date.now();save();if(S.paired)netSendSure({type:'hset',col:'musica',item:Object.assign({},s)})}});
+  document.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const s=S.h.musica.find(x=>x.id===b.dataset.lv);s.love=s.love?0:1;s.u=Date.now();save();b.classList.toggle('on',!!s.love);vib(12);if(S.paired){netSendSure({type:'hset',col:'musica',item:Object.assign({},s)});if(s.love)pushPartner('Le encantó '+s.title,'','tp')}});
+  document.querySelectorAll('[data-sx]').forEach(b=>b.onclick=()=>hDel('musica',b.dataset.sx));
+};
+
+/* ---------- Despertador: queda en Ajustes ---------- */
+V.despertador=function(){
+  render(`<button class="backlink" data-go="inicio">‹ Volver</button><section class="section"><div class="sechead"><h2>Despertador</h2><span class="label">A distancia</span></div><div class="alarm" id="alarm"></div></section>`);
+  renderAlarm();
+};
+
+/* resumen del hogar en el inicio */
+function homeSummary(){
+  const t=(S.lists.tareas||[]).filter(x=>!x.done).length,c=S.h.compras.filter(x=>!x.done).length,b=gBalance(),m=S.h.musica[0];
+  const card=(go,big,small)=>`<button class="sum" data-go="${go}"><b>${esc(big)}</b><span>${esc(small)}</span></button>`;
+  return `<div class="sums">${card('tareas',t||'Al día',t?(t===1?'tarea pendiente':'tareas pendientes'):'Sin tareas')}${card('compras',c||'Nada',c?'para comprar':'para comprar')}${card('cuentas',Math.abs(b)<1?'A mano':money(b),Math.abs(b)<1?'Cuentas al día':b>0?S.partner+' te debe':'Le debés a '+S.partner)}${card('musica',m?m.title:'Música',m?(m.by==='m'?'Lo último que mandaste':'Te mandó '+S.partner):'Mandale una canción')}</div>`;
+}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-go]');if(b)go(b.dataset.go)});
+// compartido desde otra app (Android): Spotify → Compartir → Twin Particles
+function checkShare(){const q=new URLSearchParams(location.search),u=spLink([q.get('su'),q.get('sx'),q.get('st')].join(' '));if(!q.has('su')&&!q.has('sx')&&!q.has('st'))return;history.replaceState(null,'',location.pathname);if(u){go('musica');setTimeout(()=>songForm(u),250)}}
+
 if(S.paired||S.solo){
-  const h=location.hash.slice(1);if(['inicio','albumes','listas','calendario','cartas'].includes(h))S.tab=h;
-  enterApp();
+  const h=location.hash.slice(1);if(V[h])S.tab=h;
+  enterApp();checkShare();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)netConnectToPartner();
   if(S.paired){setTimeout(setupCheck,1200);drainInbox()}
   loadBlobsFromIDB().then(()=>{if(V[S.tab]&&!$('#main').hidden)V[S.tab]()});
