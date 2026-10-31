@@ -685,7 +685,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.67';
+const VERSION='beta 0.68';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -1002,18 +1002,20 @@ function stripBlob(msg){
   if(m.letter){m.letter=Object.assign({},m.letter);delete m.letter.blob}
   if(m.photo){m.photo=Object.assign({},m.photo);delete m.photo.blob}
   if(m.item){m.item=Object.assign({},m.item);delete m.item.blob}
+  if(m.patch&&m.patch.blob){m.patch=Object.assign({},m.patch);delete m.patch.blob}
   return m;
 }
 function reattachBlob(msg){
   if(msg.letter&&msg.letter.k&&blobs[msg.letter.k])msg.letter.blob=blobs[msg.letter.k];
   if(msg.photo&&msg.photo.k&&blobs[msg.photo.k])msg.photo.blob=blobs[msg.photo.k];
   if(msg.item&&msg.item.k&&blobs[msg.item.k])msg.item.blob=blobs[msg.item.k];
+  if(msg.patch&&msg.patch.k&&blobs[msg.patch.k])msg.patch.blob=blobs[msg.patch.k];
   return msg;
 }
 /* cambios que viajan dentro de la notificación push: así llegan aunque los dos
    teléfonos nunca tengan la app abierta al mismo tiempo (el iPhone la cierra enseguida) */
 let pendSync=[],pendTO=null;
-const hasBlob=m=>!!((m.letter&&m.letter.blob)||(m.photo&&m.photo.blob)||(m.item&&m.item.blob));
+const hasBlob=m=>!!((m.patch&&m.patch.blob)||(m.letter&&m.letter.blob)||(m.photo&&m.photo.blob)||(m.item&&m.item.blob));
 function takeSync(){const out=[];let n=0;while(pendSync.length){const j=JSON.stringify(pendSync[0]);const b=new TextEncoder().encode(j).length;if(n+b>2600)break;n+=b;out.push(pendSync.shift())}return out}
 function netSendSure(msg){
   msg.mid=msg.mid||uid();msg.ts=msg.ts||Date.now();
@@ -2046,12 +2048,19 @@ function itemDetail(L,items,i){
       ${x.desc?`<p style="color:var(--muted)">${esc(x.desc)}</p>`:''}
       <span class="sub">Agregado por ${esc(x.by==='m'?meName():S.partner)}</span>
     </div>
-    ${L.kind==='place'?placeLinks(x)+`<div class="field"><span class="flabel">Nuestra reseña</span><div class="stars" id="xS">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(x.stars||0)?'on':''}" aria-label="${n} de 5">★</button>`).join('')}</div><textarea class="input" id="xR" rows="2" maxlength="280" placeholder="¿Qué les pareció?">${esc(x.review||'')}</textarea></div>`:x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
+    ${L.kind==='place'?placeLinks(x)+`<div class="field" id="xIgF" ${x.ig?'hidden':''}><label for="xIg">Instagram del lugar</label><input class="input" id="xIg" placeholder="@usuario o link del perfil" autocomplete="off" autocapitalize="none"></div>
+      <button class="btn soft full" id="xPh">${x.k?'Cambiar foto':'Agregar foto del lugar'}</button>
+      <div class="field"><span class="flabel">Nuestra reseña</span><div class="stars" id="xS">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(x.stars||0)?'on':''}" aria-label="${n} de 5">★</button>`).join('')}</div><textarea class="input" id="xR" rows="2" maxlength="280" placeholder="¿Qué les pareció?">${esc(x.review||'')}</textarea></div>`:x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
     ${L.id==='pelis'&&x.src!=='letterboxd'?`<a class="btn soft full" href="${esc(x.lb||lbSearch(x.t))}" target="_blank" rel="noopener">Ver en Letterboxd</a>`:''}
     <div class="row"><button class="btn soft full" id="dDone">${x.done?'Volver a pendiente':'Marcar como hecho'}</button><button class="btn danger" id="dDel">Quitar</button></div>`,()=>{
     if(L.kind==='place'){const pushR=()=>{save();hPending=true;if(x.id)netSendSure({type:'listedit',listId:L.id,id:x.id,patch:{stars:x.stars||0,review:x.review||''}})};
       document.querySelectorAll('#xS button').forEach(b=>b.onclick=()=>{x.stars=+b.dataset.n;document.querySelectorAll('#xS button').forEach(o=>o.classList.toggle('on',+o.dataset.n<=x.stars));vib(10);pushR()});
-      $('#xR').onchange=()=>{x.review=$('#xR').value.trim();pushR()}}
+      $('#xR').onchange=()=>{x.review=$('#xR').value.trim();pushR()}
+      const sendP=p=>{hPending=true;save();if(x.id)netSendSure({type:'listedit',listId:L.id,id:x.id,patch:p})};
+      $('#xIg').onchange=()=>{const v=$('#xIg').value.trim(),m=v.match(/instagram\.com\/([\w.]+)/i)||v.match(/^@?([\w.]{2,30})$/);if(!m)return toast('No parece un usuario de Instagram');x.ig=m[1];sendP({ig:x.ig});closeSheet();setTimeout(()=>itemDetail(L,items,i),240)};
+      $('#xPh').onclick=()=>pickPhoto(d=>{const k=uid();setBlob(k,d);x.k=k;sendP({k,blob:d});closeSheet();setTimeout(()=>itemDetail(L,items,i),240)});
+      if(x.osm&&!x.ck){const was=JSON.stringify(x);placeInfo(x).catch(()=>{}).then(()=>siteInfo(x)).catch(()=>{}).then(()=>{x.ck=1;const p={ck:1};['ig','web','tel','hours','desc','img'].forEach(f=>{if(x[f])p[f]=x[f]});sendP(p);
+        if(JSON.stringify(Object.assign({},x,{ck:undefined}))!==was&&$('#xS'))itemDetail(L,items,i)})}}
     $('#dDone').onclick=()=>{x.done=x.done?0:1;save();closeSheet();V.listas();if(x.id)netSendSure({type:'listdone',listId:L.id,id:x.id,done:x.done});if(x.done)toast('Hecho')};
     $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Quitado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
   });
@@ -2283,6 +2292,12 @@ async function placeInfo(it){
   if(e.cuisine)it.desc=e.cuisine.split(';').map(c=>CUISINE[c.trim()]||c.trim().replace(/_/g,' ')).join(', ');
   if(/^https:\/\//.test(e.image||''))it.img=e.image;
   else if(/^File:/.test(e.wikimedia_commons||''))it.img='https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(e.wikimedia_commons.slice(5))+'?width=800';
+  // lugares conocidos y cadenas: Wikidata tiene su Instagram, su web y una foto
+  const qid=e.wikidata||e['brand:wikidata'];
+  if(qid&&/^Q\d+$/.test(qid)){const w=await fetch(`https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&props=claims&format=json&origin=*`).then(x=>x.json()).catch(()=>null);const c=w&&w.entities&&w.entities[qid]&&w.entities[qid].claims;
+    if(c){const val=p=>c[p]&&c[p][0]&&c[p][0].mainsnak.datavalue&&c[p][0].mainsnak.datavalue.value;
+      if(!it.ig&&val('P2003'))it.ig=val('P2003');if(!it.web&&/^https?:/.test(val('P856')||''))it.web=val('P856');
+      if(/tile\.openstreetmap/.test(it.img||'')&&val('P18'))it.img='https://commons.wikimedia.org/wiki/Special:FilePath/'+encodeURIComponent(val('P18'))+'?width=800'}}
 }
 // la web del lugar suele tener su Instagram y una foto real; la lee el Worker
 async function siteInfo(it){
@@ -2308,9 +2323,9 @@ async function nearbyPlaces(){
 }
 function placeLinks(x){
   const a=(h,t,soft=true)=>`<a class="btn ${soft?'soft':''} full" href="${esc(h)}" target="_blank" rel="noopener">${esc(t)}</a>`;
-  const ig=x.ig?'https://www.instagram.com/'+x.ig+'/':'https://www.instagram.com/explore/search/keyword/?q='+encodeURIComponent(x.t);
+  
   return `${x.hours?`<p class="sub">Horarios: ${esc(x.hours)}</p>`:''}${a(mapsLink(x),'Ver fotos, reseñas y cómo llegar',false)}
-    <div class="row">${a(ig,x.ig?'@'+x.ig:'Buscar en Instagram')}${x.web?a(x.web,'Sitio web'):''}${x.tel?a('tel:'+x.tel.replace(/[^\d+]/g,''),'Llamar'):''}</div>`;
+    <div class="row">${x.ig?a('https://www.instagram.com/'+x.ig+'/','@'+x.ig):''}${x.web?a(x.web,'Sitio web'):''}${x.tel?a('tel:'+x.tel.replace(/[^\d+]/g,''),'Llamar'):''}</div>`;
 }
 const SEARCH_PH={rest:'Buscar restaurante, café o bar',pelis:'Buscar película, director o año',series:'Buscar serie',yt:'Buscar en YouTube',pod:'Buscar podcast'};
 const SEARCH_SRC={rest:'Google Maps',pelis:'una base de datos de películas',series:'una base de datos de series',yt:'YouTube',pod:'Spotify y Apple Podcasts'};
@@ -3014,7 +3029,7 @@ NET.onListDel=d=>{
 NET.onListEdit=d=>{
   const items=S.lists[d.listId];if(!items)return;
   const x=items.find(i=>i.id===d.id);if(!x)return;
-  const pt=Object.assign({},d.patch);if(pt.who)pt.who=flipW(pt.who);Object.assign(x,pt);save();
+  const pt=Object.assign({},d.patch);if(pt.who)pt.who=flipW(pt.who);if(pt.blob){setBlob(pt.k,pt.blob);delete pt.blob}Object.assign(x,pt);save();
   if((S.tab==='listas'||S.tab==='tareas')&&!$('#main').hidden)V.listas();
 };
 NET.onEventDel=d=>{
