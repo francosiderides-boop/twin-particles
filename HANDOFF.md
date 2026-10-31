@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.66
+**Versión actual:** beta 0.67
 
 ## Contexto (resumen del chat anterior)
 - **Quiénes:** Franco (Android, dueño del proyecto) y Cami, su pareja (iPhone 11). Franco escribe en español rioplatense y espera que cada arreglo se publique de verdad (versión nueva + commit + push), probado, no solo explicado. Pide **gastar pocos tokens**.
@@ -41,6 +41,10 @@ Datos nuevos en `S.h` y un solo par de mensajes: `hPut`/`hDel` mandan `hset`/`hd
 
 ## Cuenta y respaldo (desde beta 0.61)
 Login obligatorio con Google o mail y contraseña (`showLogin`); teléfono no, porque el SMS pide Blaze. Una cuenta anónima se convierte conservando el uid, así sigue en `couples`. Respaldo en `users/{uid}`: `data/state` y fuentes en partes (`bkPut`/`bkGet`), fotos de a una en `blobs/` (`bkPump`, máx. ~1 MB). Al entrar en un teléfono sin datos se restaura todo (`afterLogin`, `tp-restore`). Probar con el emulador de Firebase, no con cuentas reales.
+
+## Restaurantes y fechas (beta 0.67)
+Búsqueda con Photon, detalles y "cerca mío" con Nominatim (Overpass no respondió desde el navegador ni el Worker). El Worker lee la web del lugar (`{site}`) y devuelve Instagram y foto. Fotos y reseñas públicas dentro de la app requieren Google Places (tarjeta): Franco solo quiere gratis, así que abren en Google Maps.
+Fechas: `S.h.fechas`; cada teléfono manda su lista al Worker (`{rem}`, Durable Object `Rem`) y un cron diario a las 12 UTC avisa 1 mes y 1 semana antes. `remCheck` avisa también dentro de la app.
 
 ## Arquitectura
 - **Transporte:** ya vinculados, `netSend` → `fbWrite` (Firestore). PeerJS (`netConnectToPartner`, `netWire`) solo para vincularse y como respaldo. Todo lo recibido pasa por `handleMsg`.
