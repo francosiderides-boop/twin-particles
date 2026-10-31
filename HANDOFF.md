@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.64
+**Versión actual:** beta 0.65
 
 ## Contexto (resumen del chat anterior)
 - **Quiénes:** Franco (Android, dueño del proyecto) y Cami, su pareja (iPhone 11). Franco escribe en español rioplatense y espera que cada arreglo se publique de verdad (versión nueva + commit + push), probado, no solo explicado. Pide **gastar pocos tokens**.
