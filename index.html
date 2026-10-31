@@ -685,7 +685,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.68';
+const VERSION='beta 0.69';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -1076,6 +1076,9 @@ function handleMsg(d){
     else if(d.type==='pushsub'){S.partnerPushSub=d.sub;save()}
     else if(d.type==='listadd'&&NET.onListAdd)NET.onListAdd(d);
     else if(d.type==='eventadd'&&NET.onEventAdd)NET.onEventAdd(d);
+    else if(d.type==='letterdel'){const l=S.letters.find(x=>x.id===d.id);if(l){S.letters=S.letters.filter(x=>x!==l);if(l.k)delBlob(l.k);save();updateBadge();if(S.tab==='cartas'&&!$('#main').hidden&&!$('#scrim'))V.cartas()}}
+    else if(d.type==='photodel'){const a=S.albums.find(x=>x.id===d.albumId);if(a){a.photos=a.photos.filter(p=>p.k!==d.k);delBlob(d.k);save();if(!$('#main').hidden&&!$('#scrim')&&S.tab==='albumes'){if(openAlbum===a.id)albumView(a);else V.albumes()}}}
+    else if(d.type==='feedclear'){S.feed=[];save();if(S.tab==='inicio'&&typeof renderFeed==='function')renderFeed()}
     else if(d.type==='hset'&&NET.onHset)NET.onHset(d);
     else if(d.type==='hdel'&&NET.onHdel)NET.onHdel(d);
     else if(d.type==='state'&&NET.onState)NET.onState(d);
@@ -1616,7 +1619,7 @@ V.inicio=function(){
     </section>`);
     renderSigs();renderFeed();
     $('#customF').onsubmit=e=>{e.preventDefault();send($('#customI').value);$('#customI').value=''};
-    $('#allFeed').onclick=()=>sheet(`<h2>Tu historial</h2><div class="feed">${feedHTML(S.feed)}</div>`);
+    $('#allFeed').onclick=()=>feedSheet('Tu historial');
     $('#goPair').onclick=()=>{if(field){field.stop();field=null}showOnboard()};
     readColors();makeField($('#field'),0);
     return;
@@ -1642,7 +1645,7 @@ V.inicio=function(){
   `);
   renderSigs();renderFeed();
   $('#customF').onsubmit=e=>{e.preventDefault();send($('#customI').value);$('#customI').value=''};
-  $('#allFeed').onclick=()=>sheet(`<h2>Historial de señales</h2><div class="feed">${feedHTML(S.feed)}</div>`);
+  $('#allFeed').onclick=()=>feedSheet('Historial de señales');
   readColors();makeField($('#field'),1);bindTouch();
 };
 /* toques y latidos: tocar la partícula de tu pareja hace vibrar su teléfono */
@@ -1674,6 +1677,8 @@ function bindTouch(){
   cv.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')cv.style.cursor=field&&field.hit(e.clientX,e.clientY)>=0?'pointer':'default'});
   $('#tHint').onclick=sendTap;
 }
+function feedSheet(title){sheet(`<h2>${title}</h2><div class="feed">${feedHTML(S.feed)}</div>${S.feed.length?'<button class="btn danger full" id="feedX">Borrar historial</button>':''}`,()=>{
+  $('#feedX')&&($('#feedX').onclick=()=>sheet(`<h2>¿Borrar el historial?</h2><p class="sub">Se borra para los dos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.feed=[];save();if(S.paired)netSendSure({type:'feedclear'});closeSheet();renderFeed();toast('Historial borrado')}}))})}
 function renderSigs(){
   const el=$('#sigs');if(!el)return;
   el.innerHTML=S.signals.map((s,i)=>`<button class="chip" data-i="${i}">${esc(s)}</button>`).join('')+`<button class="chip add" id="addSig">+ Nueva</button>`;
@@ -1845,9 +1850,10 @@ function albumView(a){
     ${a.photos.length?'<div class="grid3" id="phs"></div>':'<p class="empty">Todavía no hay fotos. Las que agregues las ven los dos.</p>'}
    </section>`);
   if(a.photos.length)$('#phs').innerHTML=a.photos.map((p,i)=>`<button class="ph" data-i="${i}" style="background-image:url('${photoSrc(p)}')" aria-label="Ver foto ${i+1}"></button>`).join('');
-  document.querySelectorAll('.ph').forEach(b=>b.onclick=()=>{$('#layer').innerHTML=`<div class="lightbox" id="lb"><img src="${photoSrc(a.photos[b.dataset.i])}" alt="Foto ${+b.dataset.i+1} del álbum ${esc(a.name)}"></div>`;$('#lb').onclick=()=>$('#layer').innerHTML=''});
+  document.querySelectorAll('.ph').forEach(b=>b.onclick=()=>{const p=a.photos[b.dataset.i];$('#layer').innerHTML=`<div class="lightbox" id="lb"><img src="${photoSrc(p)}" alt="Foto ${+b.dataset.i+1} del álbum ${esc(a.name)}"><button class="btn danger" id="lbX" style="position:absolute;right:16px;bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--surface)">Borrar foto</button></div>`;$('#lb').onclick=()=>$('#layer').innerHTML='';
+    $('#lbX').onclick=e=>{e.stopPropagation();sheet(`<h2>¿Borrar esta foto?</h2><p class="sub">Se borra para los dos y no se puede recuperar.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{a.photos=a.photos.filter(x=>x!==p);delBlob(p.k);save();netSendSure({type:'photodel',albumId:a.id,k:p.k});closeSheet();albumView(a);toast('Foto borrada')}})}});
   $('#bk').onclick=()=>{openAlbum=null;V.albumes()};
-  $('#delA').onclick=()=>sheet(`<h2>¿Borrar “${esc(a.name)}”?</h2><p class="sub">Se borra para los dos, con todas sus fotos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.albums=S.albums.filter(x=>x!==a);save();netSendSure({type:'albumdel',id:a.id});openAlbum=null;closeSheet();V.albumes();toast('Álbum borrado')}});
+  $('#delA').onclick=()=>sheet(`<h2>¿Borrar “${esc(a.name)}”?</h2><p class="sub">Se borra para los dos, con todas sus fotos.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.albums=S.albums.filter(x=>x!==a);a.photos.forEach(p=>p.k&&delBlob(p.k));save();netSendSure({type:'albumdel',id:a.id});openAlbum=null;closeSheet();V.albumes();toast('Álbum borrado')}});
   $('#up').onchange=e=>{const fs=[...e.target.files];if(!fs.length)return;let n=0;fs.forEach(f=>{readPhoto(f).then(data=>{const k=uid();setBlob(k,data);a.photos.unshift({k});netSendSure({type:'photoadd',albumId:a.id,albumName:a.name,albumDate:a.date,photo:{k,blob:data}});if(++n===fs.length){save();albumView(a);entangle();toast(fs.length+(fs.length>1?' fotos agregadas':' foto agregada'))}})})};
 }
 
@@ -2052,7 +2058,7 @@ function itemDetail(L,items,i){
       <button class="btn soft full" id="xPh">${x.k?'Cambiar foto':'Agregar foto del lugar'}</button>
       <div class="field"><span class="flabel">Nuestra reseña</span><div class="stars" id="xS">${[1,2,3,4,5].map(n=>`<button type="button" data-n="${n}" class="${n<=(x.stars||0)?'on':''}" aria-label="${n} de 5">★</button>`).join('')}</div><textarea class="input" id="xR" rows="2" maxlength="280" placeholder="¿Qué les pareció?">${esc(x.review||'')}</textarea></div>`:x.url?`<a class="btn full" href="${esc(x.url)}" target="_blank" rel="noopener">Abrir en ${esc(srcLabel(x)||'el navegador')}</a>`:''}
     ${L.id==='pelis'&&x.src!=='letterboxd'?`<a class="btn soft full" href="${esc(x.lb||lbSearch(x.t))}" target="_blank" rel="noopener">Ver en Letterboxd</a>`:''}
-    <div class="row"><button class="btn soft full" id="dDone">${x.done?'Volver a pendiente':'Marcar como hecho'}</button><button class="btn danger" id="dDel">Quitar</button></div>`,()=>{
+    <div class="row"><button class="btn soft full" id="dDone">${x.done?'Volver a pendiente':'Marcar como hecho'}</button><button class="btn danger" id="dDel">Borrar</button></div>`,()=>{
     if(L.kind==='place'){const pushR=()=>{save();hPending=true;if(x.id)netSendSure({type:'listedit',listId:L.id,id:x.id,patch:{stars:x.stars||0,review:x.review||''}})};
       document.querySelectorAll('#xS button').forEach(b=>b.onclick=()=>{x.stars=+b.dataset.n;document.querySelectorAll('#xS button').forEach(o=>o.classList.toggle('on',+o.dataset.n<=x.stars));vib(10);pushR()});
       $('#xR').onchange=()=>{x.review=$('#xR').value.trim();pushR()}
@@ -2062,7 +2068,7 @@ function itemDetail(L,items,i){
       if(x.osm&&!x.ck){const was=JSON.stringify(x);placeInfo(x).catch(()=>{}).then(()=>siteInfo(x)).catch(()=>{}).then(()=>{x.ck=1;const p={ck:1};['ig','web','tel','hours','desc','img'].forEach(f=>{if(x[f])p[f]=x[f]});sendP(p);
         if(JSON.stringify(Object.assign({},x,{ck:undefined}))!==was&&$('#xS'))itemDetail(L,items,i)})}}
     $('#dDone').onclick=()=>{x.done=x.done?0:1;save();closeSheet();V.listas();if(x.id)netSendSure({type:'listdone',listId:L.id,id:x.id,done:x.done});if(x.done)toast('Hecho')};
-    $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Quitado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
+    $('#dDel').onclick=()=>{const [gone]=items.splice(i,1);save();closeSheet();V.listas();if(gone.id)netSendSure({type:'listdel',listId:L.id,id:gone.id});toast('Borrado de '+L.n,'Deshacer',()=>{items.splice(i,0,gone);save();V.listas()})};
   });
 }
 /* buscador: catálogo inicial reducido */
@@ -2523,8 +2529,9 @@ async function openLetter(l){
   if(l.kind==='text')body=paperHTML(l,l.from==='p'?S.partner:'');
   else if(l.kind==='photo'){const src=l.sample?await genPaper():blobs[l.k];body=src?`<img class="paper" src="${src}" alt="Foto de una carta escrita a mano">`:'<div class="note">Esta foto no quedó guardada en este teléfono.</div>'}
   else body=`<div class="player"><button class="play" id="pl" aria-label="Reproducir"><svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></button><div class="prog"><i id="pg"></i></div><span class="label" id="pt">0:00</span></div>${l.sample?'<p class="sub">Audio de ejemplo generado por el prototipo.</p>':''}`;
-  sheet(`<span class="label">${l.from==='p'?'De '+esc(S.partner):'Para '+esc(S.partner)} · ${fmtD(l.date)}</span><h2>${esc(l.title)}</h2>${body}<button class="btn soft full" id="cl">Cerrar</button>`,()=>{
+  sheet(`<span class="label">${l.from==='p'?'De '+esc(S.partner):'Para '+esc(S.partner)} · ${fmtD(l.date)}</span><h2>${esc(l.title)}</h2>${body}<button class="btn soft full" id="cl">Cerrar</button><button class="btn danger full" id="lX">Borrar carta</button>`,()=>{
     $('#cl').onclick=closeSheet;
+    $('#lX').onclick=()=>sheet(`<h2>¿Borrar “${esc(l.title)}”?</h2><p class="sub">Se borra para los dos y no se puede recuperar.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si">Borrar</button></div>`,()=>{$('#no').onclick=closeSheet;$('#si').onclick=()=>{S.letters=S.letters.filter(x=>x!==l);if(l.k)delBlob(l.k);save();netSendSure({type:'letterdel',id:l.id});updateBadge();closeSheet();if(S.tab==='cartas')V.cartas();toast('Carta borrada')}});
     if(l.kind==='audio')$('#pl').onclick=()=>l.sample?playTune():playBlob(blobs[l.k]);
   });
   if(l.from==='p'&&!l.opened){l.opened=1;save();entangle();updateBadge();netSendSure({type:'letterRead',id:l.id});box='in';if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();toast('Guardada en el cajón de cartas')}
@@ -2926,9 +2933,9 @@ $('#openSettings').onclick=()=>{
     $('#pDiag')&&($('#pDiag').onclick=()=>{closeSheet();pushDiag()});
     $('#resendHand')&&($('#resendHand').onclick=()=>{sendMyFont();toast(NET.ready?'Letra reenviada a '+S.partner:'Guardado · se manda sola en cuanto '+S.partner+' se conecte')});
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
-    $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
+    $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se borra de este teléfono y de tu respaldo: señales, listas, tareas, agenda, cuentas, recetas, música, álbumes y cartas. Lo que tiene tu pareja no se toca. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
-      $('#si').onclick=()=>{const keep={tab:S.tab,sub:S.sub,acct:S.acct,lastUid:S.lastUid,skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt,solo:S.solo,myPeerId:S.myPeerId,partnerPeerId:S.partnerPeerId,myPushSub:S.myPushSub,partnerPushSub:S.partnerPushSub};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);ensureH();save();closeSheet();go('inicio');toast('Se borró todo')}});
+      $('#si').onclick=()=>{Object.keys(blobs).forEach(delBlob);const keep={tab:S.tab,sub:S.sub,acct:S.acct,lastUid:S.lastUid,skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt,solo:S.solo,myPeerId:S.myPeerId,partnerPeerId:S.partnerPeerId,myPushSub:S.myPushSub,partnerPushSub:S.partnerPushSub};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);ensureH();remSync();save();closeSheet();go('inicio');toast('Se borró todo')}});
     $('#unpair')&&($('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#si').onclick=()=>{netSend({type:'unpair'});S.paired=false;S.solo=true;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();toast('Desvinculado · seguís como partícula solitaria');go(S.tab)}}));
     $('#pairNow')&&($('#pairNow').onclick=()=>{closeSheet();if(field){field.stop();field=null}showOnboard()});
@@ -3010,6 +3017,7 @@ NET.onPhotoAdd=d=>{
 };
 NET.onAlbumDel=d=>{
   if(!d.id)return;
+  const gone=S.albums.find(x=>x.id===d.id);if(gone)gone.photos.forEach(p=>p.k&&delBlob(p.k));
   S.albums=S.albums.filter(x=>x.id!==d.id);save();
   if(openAlbum===d.id)openAlbum=null;
   if(S.tab==='albumes'&&!$('#main').hidden)V.albumes();
