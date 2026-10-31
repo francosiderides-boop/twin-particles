@@ -573,8 +573,9 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.55';
+const VERSION='beta 0.56';
 const CHANGELOG=[
+  ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
   ['beta 0.55',['Alarma: botón para hacer sonar su iPhone con Buscar de Apple si no contesta']],
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
@@ -829,7 +830,7 @@ async function fbStart(){
     FB.ref.onSnapshot(snap=>{
       const d=snap.data()||{},subs=d.subs||{},vis=d.vis||{},p=(d.members||[]).find(x=>x!==FB.uid);
       if(p&&subs[p]&&(!S.partnerPushSub||S.partnerPushSub.endpoint!==subs[p].endpoint)){S.partnerPushSub=subs[p];save()}
-      partnerVis=!!(p&&vis[p]&&vis[p].v&&Date.now()-vis[p].t<90000);
+      partnerVis=!!(p&&vis[p]&&vis[p].v&&Date.now()-vis[p].t<30000);
       partnerDiag=p&&d.diag&&d.diag[p]||null;
       if(S.myPushSub&&(!subs[FB.uid]||subs[FB.uid].endpoint!==S.myPushSub.endpoint))fbSub(S.myPushSub);
     },e=>{FB.err=String(e.code||e)});
@@ -854,7 +855,7 @@ function fbVis(){if(FB.ready)FB.ref.update({['vis.'+FB.uid]:{v:document.visibili
 // estado de avisos de este teléfono: la pareja lo ve en "Revisar avisos" sin tener que pedirle nada
 function fbDiag(){if(!FB.ready)return;const perm='Notification' in window?Notification.permission:'none';
   FB.ref.update({['diag.'+FB.uid]:{ios:isIOS,app:isApp(),perm,sub:!!S.myPushSub,ok:!S.pushBlocked&&!!S.myPushSub,err:S.lastPushErr||null,v:VERSION,t:Date.now()}}).catch(()=>{})}
-setInterval(()=>{if(document.visibilityState==='visible')fbVis()},60000);
+setInterval(()=>{if(document.visibilityState==='visible')fbVis()},20000);
 function netSend(msg){
   if(S.paired&&coupleId()&&FB.ready){fbWrite(msg);return}
   // mientras Firebase no responde, la conexión directa queda de respaldo
