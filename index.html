@@ -685,7 +685,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.63';
+const VERSION='beta 0.64';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -882,7 +882,8 @@ function compressImage(file,maxDim=1280,quality=0.78){ // chica para que entre e
         const c=document.createElement('canvas');c.width=w;c.height=h;
         c.getContext('2d').drawImage(img,0,0,w,h);
         URL.revokeObjectURL(url);
-        res(c.toDataURL('image/jpeg',quality));
+        let out=c.toDataURL('image/jpeg',quality);for(let q=quality-.14;out.length>900000&&q>.3;q-=.14)out=c.toDataURL('image/jpeg',q);
+        res(out);
       }catch(e){URL.revokeObjectURL(url);res(null)}
     };
     img.onerror=()=>{URL.revokeObjectURL(url);res(null)};
@@ -909,6 +910,7 @@ let saveTO=0;
 const AC={uid:null,to:0,last:null,out:false,pumping:0};
 function saveNow(){clearTimeout(saveTO);saveTO=0;if(AC.out)return;try{localStorage.setItem('tp-state',JSON.stringify(S))}catch(e){}if(AC.uid&&!AC.to)AC.to=setTimeout(bkSave,15000)}
 function save(){if(!saveTO)saveTO=setTimeout(saveNow,300)}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&iso(new Date())!==TODAYS&&!$('#scrim')&&!$('#ring'))location.reload()});
 addEventListener('pagehide',saveNow);document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){if(saveTO)saveNow();if(AC.to)bkSave()}});
 
 /* =========================================================
@@ -970,7 +972,9 @@ async function fbStart(){
 function fbWrite(msg){
   if(!FB.ready){FB.q.push(msg);fbStart();return}
   msg.ts=msg.ts||Date.now();
-  FB.ref.collection('msgs').add({from:FB.uid,t:firebase.firestore.FieldValue.serverTimestamp(),d:msg}).catch(e=>{FB.err=String(e.code||e)});
+  const clean=JSON.stringify(msg);
+  if(clean.length>1040000){toast('Es muy pesado para enviarlo: queda solo en este teléfono');return}
+  FB.ref.collection('msgs').add({from:FB.uid,t:firebase.firestore.FieldValue.serverTimestamp(),d:JSON.parse(clean)}).catch(e=>{FB.err=String(e.code||e);toast('No se pudo enviar. Revisá la conexión')});
 }
 function fbSub(sub){if(FB.ready&&sub)FB.ref.update({['subs.'+FB.uid]:sub}).catch(()=>{})}
 function fbVis(){if(FB.ready)FB.ref.update({['vis.'+FB.uid]:{v:document.visibilityState==='visible',t:Date.now()}}).catch(()=>{})}
@@ -1534,6 +1538,7 @@ async function genPaper(){
 
 /* navegación */
 const V={};
+let sheetBack=false,pendPush=null;
 const GROUPS={inicio:['inicio'],hogar:['tareas','compras','cuentas','calendario'],comidas:['recetas','platos'],ocio:['listas','musica'],recuerdos:['albumes','cartas']};
 const SUBN={tareas:'Tareas',compras:'Compras',cuentas:'Cuentas',calendario:'Agenda',recetas:'Recetas',platos:'Platos',listas:'Para ver',musica:'Música',albumes:'Álbumes',cartas:'Cartas'};
 const groupOf=v=>Object.keys(GROUPS).find(g=>GROUPS[g].includes(v))||'inicio';
@@ -1545,8 +1550,8 @@ function subBadge(v){
 function subnavHTML(){const l=GROUPS[groupOf(S.tab)];if(l.length<2)return '';const w=100/l.length;
   return `<div class="subnav" role="tablist"><i id="subPill" style="width:calc((100% - 8px)/${l.length});transform:translateX(${subFrom*100}%)"></i>${l.map(v=>`<button role="tab" aria-selected="${v===S.tab}" class="${v===S.tab?'on':''}" data-go="${v}">${SUBN[v]}${subBadge(v)?`<span class="sb">${subBadge(v)}</span>`:''}</button>`).join('')}</div>`}
 function go(tab,fromPop){
-  if(!V[tab])tab='inicio';
-  if(!fromPop&&S.tab!==tab)try{history.pushState({tab},'')}catch(e){}
+  if(!Object.hasOwn(V,tab))tab='inicio';
+  if(!fromPop&&S.tab!==tab){if(sheetBack)pendPush=tab;else try{history.pushState({tab},'')}catch(e){}}
   const grp=groupOf(tab),same=groupOf(S.tab)===grp,from=GROUPS[grp].indexOf(S.tab),to=GROUPS[grp].indexOf(tab);
   slideDir=same&&from>=0&&to!==from?(to>from?'fromR':'fromL'):'';subFrom=same&&from>=0?from:to;
   S.tab=tab;if(to>=0){S.sub=S.sub||{};S.sub[grp]=tab}save();
@@ -1576,8 +1581,7 @@ addEventListener('scroll',()=>{const t=$('.top');if(t)t.classList.toggle('scroll
 document.addEventListener('pointerdown',e=>{const c=e.target.closest&&e.target.closest('.check');if(c){c.classList.remove('popping');void c.offsetWidth;c.classList.add('popping')}},{passive:true});
 document.querySelectorAll('.tb').forEach(b=>b.onclick=()=>{const g=b.dataset.tab,hot=g==='recuerdos'&&subBadge('cartas')?'cartas':null;vib(6);go(hot||S.sub&&S.sub[g]||GROUPS[g][0])});
 // botón Atrás: cierra la hoja abierta o vuelve a la sección anterior
-let sheetBack=false;
-addEventListener('popstate',e=>{if(sheetBack){sheetBack=false;return}if($('#scrim')){closeSheet(true);return}const t=e.state&&e.state.tab;if(t&&!$('#main').hidden)go(t,true)});
+addEventListener('popstate',e=>{if(sheetBack){sheetBack=false;if(pendPush){try{history.pushState({tab:pendPush},'')}catch(err){}pendPush=null}return}if($('#scrim')){closeSheet(true);return}const t=e.state&&e.state.tab;if(t&&!$('#main').hidden)go(t,true)});
 // deslizar de costado cambia de sub-sección
 let swX=0,swY=0,swT=0,swOn=false;
 $('#view').addEventListener('touchstart',e=>{swOn=e.touches.length===1&&!e.target.closest('.tabs,.chips,input,textarea,iframe,canvas,.mb,.cal');if(swOn){swX=e.touches[0].clientX;swY=e.touches[0].clientY;swT=Date.now()}},{passive:true});
@@ -2836,7 +2840,7 @@ $('#openSettings').onclick=()=>{
     $('#sOk').onclick=()=>{S.partner=$('#sp').value.trim()||'Mi pareja';save();closeSheet();go(S.tab)};
     $('#reset').onclick=()=>sheet(`<h2>¿Borrar todo lo que cargaste?</h2><p class="sub">Se pierden las señales, listas, tareas, eventos, álbumes y cartas. Se mantienen el vínculo, los nombres y los ajustes. Esto no se puede deshacer.</p><div class="field"><label for="rc">Escribí BORRAR para confirmar</label><input class="input" id="rc" autocomplete="off" autocapitalize="characters"></div><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn danger full" id="si" disabled>Borrar todo</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#rc').oninput=e=>{$('#si').disabled=e.target.value.trim().toUpperCase()!=='BORRAR'};
-      $('#si').onclick=()=>{const keep={acct:S.acct,lastUid:S.lastUid,skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();closeSheet();go('inicio');toast('Se borró todo')}});
+      $('#si').onclick=()=>{const keep={tab:S.tab,sub:S.sub,acct:S.acct,lastUid:S.lastUid,skin:S.skin,prefs:S.prefs,partner:S.partner,paired:S.paired,pairedAt:S.pairedAt,solo:S.solo,myPeerId:S.myPeerId,partnerPeerId:S.partnerPeerId,myPushSub:S.myPushSub,partnerPushSub:S.partnerPushSub};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);ensureH();save();closeSheet();go('inicio');toast('Se borró todo')}});
     $('#unpair')&&($('#unpair').onclick=()=>sheet(`<h2>¿Desvincular de ${esc(S.partner)}?</h2><p class="sub">Los dos teléfonos dejan de estar conectados. Para volver a vincularlos van a necesitar un código nuevo.</p><div class="row"><button class="btn soft full" id="no">Cancelar</button><button class="btn full" id="si">Desvincular</button></div>`,()=>{
       $('#no').onclick=closeSheet;$('#si').onclick=()=>{netSend({type:'unpair'});S.paired=false;S.solo=true;S.pairedAt=null;S.myPeerId=null;S.partnerPeerId=null;if(NET.peer)try{NET.peer.destroy()}catch(e){}save();closeSheet();toast('Desvinculado · seguís como partícula solitaria');go(S.tab)}}));
     $('#pairNow')&&($('#pairNow').onclick=()=>{closeSheet();if(field){field.stop();field=null}showOnboard()});
@@ -2850,7 +2854,7 @@ function bindSheetDrag(){const sh=$('#scrim .sheet');let y0=null,dy=0;
   sh.addEventListener('touchstart',e=>{y0=sh.scrollTop<=0&&!e.target.closest('input,textarea,select,canvas,.sheet-paper')?e.touches[0].clientY:null;dy=0},{passive:true});
   sh.addEventListener('touchmove',e=>{if(y0==null)return;dy=e.touches[0].clientY-y0;if(dy>0){sh.style.transition='none';sh.style.transform=`translateY(${dy}px)`}},{passive:true});
   sh.addEventListener('touchend',()=>{if(y0==null)return;y0=null;if(dy>90)closeSheet();else{sh.style.transition='transform .22s var(--ease)';sh.style.transform=''}},{passive:true})}
-function closeSheet(fromPop){if(fromPop!==true&&history.state&&history.state.sheet){sheetBack=true;history.back()}const sc=$('#scrim');if(sc&&!reduce){sc.classList.add('closing');sc.style.pointerEvents='none';sc.removeAttribute('id');setTimeout(()=>{if(sc.isConnected)sc.remove()},220)}else $('#layer').innerHTML='';if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();try{lastFocus&&lastFocus.focus&&document.body.contains(lastFocus)&&lastFocus.focus()}catch(e){}}
+function closeSheet(fromPop){if(fromPop!==true&&history.state&&history.state.sheet){sheetBack=true;history.back()}const sc=$('#scrim');if(sc&&!reduce){sc.classList.add('closing');sc.style.pointerEvents='none';sc.removeAttribute('id');setTimeout(()=>{if(sc.isConnected)sc.remove()},220)}else $('#layer').innerHTML='';if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();setTimeout(hFlush,240);try{lastFocus&&lastFocus.focus&&document.body.contains(lastFocus)&&lastFocus.focus()}catch(e){}}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#layer').innerHTML)closeSheet()});
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',readColors);
 new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
@@ -2964,17 +2968,23 @@ NET.onUnpair=()=>{
    hset (crear o editar) y hdel (borrar). Lo relativo a quién es quién se invierte
    al recibir: by/paid con flipW y mine (el % del gasto que le toca a cada uno).
    ========================================================= */
-S.h=S.h||{};['gastos','movs','cfg','compras','clist','recetas','platos','musica'].forEach(k=>S.h[k]=S.h[k]||[]);
+function ensureH(){S.h=S.h||{};['gastos','movs','cfg','compras','clist','recetas','platos','musica'].forEach(k=>S.h[k]=S.h[k]||[])}
+ensureH();
 const HVIEWS={gastos:['cuentas','inicio'],movs:['cuentas','inicio'],cfg:['cuentas','inicio'],compras:['compras','inicio'],clist:['compras'],recetas:['recetas'],platos:['platos'],musica:['musica','inicio']};
 const onScreen=()=>!$('#main').hidden;
-function hRefresh(col){const a=HVIEWS[col]||[];if(a.includes(S.tab)&&onScreen()&&!$('#scrim')&&V[S.tab])V[S.tab]()}
+let hPending=false;
+function hRefresh(col,own){const a=HVIEWS[col]||[];if(!a.includes(S.tab)||!onScreen()||!V[S.tab])return;
+  const ae=document.activeElement,typing=ae&&/INPUT|TEXTAREA/.test(ae.tagName)&&ae.closest('#view');
+  if($('#scrim')||(typing&&!own)){hPending=true;return}V[S.tab]()}
+function hFlush(){if(!hPending||$('#scrim'))return;const ae=document.activeElement;if(ae&&/INPUT|TEXTAREA/.test(ae.tagName)&&ae.closest('#view'))return;hPending=false;if(onScreen()&&V[S.tab])V[S.tab]()}
+document.addEventListener('focusout',()=>setTimeout(hFlush,80));
 function hPut(col,item,note){
   item.id=item.id||uid();item.u=Date.now();
   const a=S.h[col],i=a.findIndex(x=>x.id===item.id);if(i>=0)a[i]=item;else a.unshift(item);save();
   if(S.paired){const w=Object.assign({},item);if(w.k&&blobs[w.k]&&i<0)w.blob=blobs[w.k];netSendSure({type:'hset',col,item:w});if(note)pushPartner(note,'','tp')}
-  hRefresh(col);
+  hRefresh(col,true);
 }
-function hDel(col,id,quiet){const it=S.h[col].find(x=>x.id===id),ph=it&&it.k&&blobs[it.k];S.h[col]=S.h[col].filter(x=>{if(x.id===id&&x.k)delBlob(x.k);return x.id!==id});save();if(S.paired)netSendSure({type:'hdel',col,id});hRefresh(col);
+function hDel(col,id,quiet){const it=S.h[col].find(x=>x.id===id),ph=it&&it.k&&blobs[it.k];S.h[col]=S.h[col].filter(x=>{if(x.id===id&&x.k)delBlob(x.k);return x.id!==id});save();if(S.paired)netSendSure({type:'hdel',col,id});hRefresh(col,true);
   if(it&&!quiet)toast('Borrado','Deshacer',()=>{if(ph)setBlob(it.k,ph);hPut(col,it)})}
 NET.onHset=d=>{
   const a=S.h[d.col];if(!a||!d.item||!d.item.id)return;
@@ -2984,7 +2994,7 @@ NET.onHset=d=>{
   if(it.by)it.by=flipW(it.by);if(it.paid)it.paid=flipW(it.paid);if(it.mine!=null)it.mine=100-it.mine;
   if(i>=0)a[i]=it;else{a.unshift(it);entangle()}save();hRefresh(d.col);
 };
-NET.onHdel=d=>{const a=S.h[d.col];if(!a)return;S.h[d.col]=a.filter(x=>x.id!==d.id);save();hRefresh(d.col)};
+NET.onHdel=d=>{const a=S.h[d.col];if(!a)return;S.h[d.col]=a.filter(x=>{if(x.id===d.id&&x.k)delBlob(x.k);return x.id!==d.id});save();hRefresh(d.col)};
 
 /* festejo chico al terminar algo */
 function confetti(){
@@ -3178,14 +3188,14 @@ function recetaView(r){
     $('#rDel')&&($('#rDel').onclick=()=>{closeSheet();hDel('recetas',r.id)});
   });
 }
-function recetaForm(r){
-  let ph=null;
+function recetaForm(r,pre){
+  let ph=pre&&pre.ph||null;
   sheet(`<h2>${r?'Editar receta':'Nueva receta'}</h2>
-    <div class="field"><label for="fT">Nombre</label><input class="input" id="fT" maxlength="60" value="${esc(r?r.t:'')}"></div>
+    <div class="field"><label for="fT">Nombre</label><input class="input" id="fT" maxlength="60" value="${esc(r?r.t:pre?pre.t:'')}"></div>
     <div class="field"><label for="fM">Tiempo</label><input class="input" id="fM" maxlength="20" placeholder="30 min" value="${esc(r?r.time||'':'')}"></div>
     <div class="field"><label for="fI">Ingredientes (uno por renglón)</label><textarea class="input" id="fI" rows="5">${esc(r?(r.ing||[]).join('\n'):'')}</textarea></div>
     <div class="field"><label for="fS">Pasos (uno por renglón)</label><textarea class="input" id="fS" rows="5">${esc(r?(r.steps||[]).join('\n'):'')}</textarea></div>
-    <button class="btn soft full" id="fP">Sacar o elegir foto</button><button class="btn full" id="fO">Guardar</button>`,()=>{
+    <button class="btn soft full" id="fP">${ph?'Foto lista ✓':'Sacar o elegir foto'}</button><button class="btn full" id="fO">Guardar</button>`,()=>{
     $('#fP').onclick=()=>pickPhoto(d=>{ph=d;$('#fP').textContent='Foto lista ✓'});
     $('#fO').onclick=()=>{const t=$('#fT').value.trim();if(!t){toast('Ponele un nombre');return}
       const lines=id=>$(id).value.split('\n').map(x=>x.trim()).filter(Boolean),it=Object.assign({by:'m'},r||{},{t,time:$('#fM').value.trim(),ing:lines('#fI'),steps:lines('#fS')});
@@ -3215,7 +3225,7 @@ function platoForm(photo){
 function platoView(d){
   sheet(`${blobs[d.k]?`<img class="bigph" src="${blobs[d.k]}" alt="">`:''}<h2>${esc(d.n)}</h2><span class="label">${d.stars?'★'.repeat(d.stars)+' · ':''}${fmtLong(d.date)}${d.by==='p'?' · '+esc(S.partner):''}</span>${d.note?`<p>${esc(d.note)}</p>`:''}
     <button class="btn soft full" id="dR">Guardar como receta</button><button class="btn danger full" id="dX">Borrar</button>`,()=>{
-    $('#dR').onclick=()=>{closeSheet();setTimeout(()=>recetaForm(),230)};
+    $('#dR').onclick=()=>{closeSheet();setTimeout(()=>recetaForm(null,{t:d.n,ph:blobs[d.k]}),230)};
     $('#dX').onclick=()=>{closeSheet();hDel('platos',d.id)};
   });
 }
@@ -3279,7 +3289,7 @@ function checkShare(){const q=new URLSearchParams(location.search),u=spLink([q.g
    Una cuenta anónima previa se convierte (mismo uid), así no se pierde la pareja.
    ========================================================= */
 const authReady=()=>new Promise(r=>{const u=firebase.auth().onAuthStateChanged(x=>{u();r(x)})});
-const AUTH_ERR={'auth/invalid-email':'Ese mail no parece válido','auth/weak-password':'La contraseña necesita al menos 6 caracteres','auth/email-already-in-use':'Ya hay una cuenta con ese mail: tocá Entrar','auth/invalid-credential':'Mail o contraseña incorrectos','auth/wrong-password':'Mail o contraseña incorrectos','auth/user-not-found':'No hay una cuenta con ese mail: tocá Crear cuenta','auth/too-many-requests':'Demasiados intentos: probá en unos minutos','auth/network-request-failed':'Sin conexión: revisá internet','auth/popup-blocked':'El teléfono no abrió Google: entrá con tu mail','auth/popup-closed-by-user':'Se cerró la ventana de Google','auth/cancelled-popup-request':'Se cerró la ventana de Google','auth/operation-not-supported-in-this-environment':'Google no abre desde acá: entrá con tu mail','auth/unauthorized-domain':'Google todavía no está habilitado para esta dirección'};
+const AUTH_ERR={'auth/missing-email':'Escribí tu mail','auth/missing-password':'Escribí una contraseña','auth/invalid-login-credentials':'Mail o contraseña incorrectos','auth/account-exists-with-different-credential':'Ese mail ya entra de otra forma: probá con mail y contraseña','auth/requires-recent-login':'Volvé a entrar para seguir','auth/invalid-email':'Ese mail no parece válido','auth/weak-password':'La contraseña necesita al menos 6 caracteres','auth/email-already-in-use':'Ya hay una cuenta con ese mail: tocá Entrar','auth/invalid-credential':'Mail o contraseña incorrectos','auth/wrong-password':'Mail o contraseña incorrectos','auth/user-not-found':'No hay una cuenta con ese mail: tocá Crear cuenta','auth/too-many-requests':'Demasiados intentos: probá en unos minutos','auth/network-request-failed':'Sin conexión: revisá internet','auth/popup-blocked':'El teléfono no abrió Google: entrá con tu mail','auth/popup-closed-by-user':'Se cerró la ventana de Google','auth/cancelled-popup-request':'Se cerró la ventana de Google','auth/operation-not-supported-in-this-environment':'Google no abre desde acá: entrá con tu mail','auth/unauthorized-domain':'Google todavía no está habilitado para esta dirección'};
 function showLogin(){
   $('#main').hidden=true;$('#onboard').hidden=false;
   $('#onboard').innerHTML=`<div class="ob"><div class="ob-top">${LOGO(34)}</div><div class="ob-panel">
@@ -3290,7 +3300,8 @@ function showLogin(){
     <div class="row"><button class="btn soft" style="flex:1" id="lgIn">Entrar</button><button class="btn soft" style="flex:1" id="lgNew">Crear cuenta</button></div>
     <button class="linkbtn" id="lgF">Olvidé mi contraseña</button><p class="sub" id="lgE" role="status"></p></div></div>`;
   const msg=t=>{const e=$('#lgE');if(e)e.textContent=t};
-  const run=async(fn)=>{msg('Un momento…');try{await fbLoad();await authReady();const r=await fn();await afterLogin(r.user,r.switched)}catch(e){msg(AUTH_ERR[e&&e.code]||'No se pudo entrar ('+(e&&(e.code||e.message))+')')}};
+  let busy=false;
+  const run=async(fn)=>{if(busy)return;busy=true;document.querySelectorAll('#onboard .btn').forEach(b=>b.disabled=true);msg('Un momento…');try{await fbLoad();await authReady();const r=await fn();await afterLogin(r.user,r.switched)}catch(e){msg(AUTH_ERR[e&&e.code]||(/conexión/.test(e&&e.message||'')?'Sin conexión: revisá internet':'No se pudo entrar ('+(e&&(e.code||e.message))+')'))}busy=false;document.querySelectorAll('#onboard .btn').forEach(b=>b.disabled=false)};
   const creds=()=>[$('#lgM').value.trim(),$('#lgP').value];
   $('#lgG').onclick=()=>run(async()=>{
     const a=firebase.auth(),p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});
@@ -3304,6 +3315,7 @@ function showLogin(){
   $('#lgNew').onclick=()=>run(async()=>{const[m,w]=creds(),a=firebase.auth();
     if(a.currentUser&&a.currentUser.isAnonymous)return{user:(await a.currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(m,w))).user};
     return{user:(await a.createUserWithEmailAndPassword(m,w)).user}});
+  ['#lgM','#lgP'].forEach(i=>$(i).onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#lgIn').click()}});
   $('#lgF').onclick=async()=>{const m=$('#lgM').value.trim();if(!m){msg('Escribí tu mail arriba y volvé a tocar acá');return}try{await fbLoad();await firebase.auth().sendPasswordResetEmail(m);msg('Te mandamos un mail para cambiarla')}catch(e){msg(AUTH_ERR[e.code]||'No se pudo mandar el mail')}};
 }
 async function afterLogin(user,switched){
@@ -3340,7 +3352,7 @@ function bkSave(){
   clearTimeout(AC.to);AC.to=0;if(!AC.uid||AC.out)return Promise.resolve();
   const j=JSON.stringify(Object.assign({},S,{myPushSub:null}));const ps=[];
   if(j!==AC.last){AC.last=j;ps.push(bkPut('state',j))}
-  for(const k of ['tp-font','tp-glyphs','tp-partner-font']){let v=null;try{v=localStorage.getItem(k)}catch(e){}if(v&&v!==AC['l'+k]){AC['l'+k]=v;ps.push(bkPut(k,v))}}
+  for(const k of ['tp-font','tp-glyphs','tp-partner-font']){let v=null;try{v=localStorage.getItem(k)}catch(e){}const sig=v&&v.length+':'+v.slice(-40);S.bkF=S.bkF||{};if(v&&sig!==S.bkF[k]){S.bkF[k]=sig;ps.push(bkPut(k,v))}}
   return Promise.all(ps).catch(()=>{AC.last=null});
 }
 // las fotos de a una, para no trabar la app ni gastar datos de golpe
@@ -3367,13 +3379,14 @@ async function acctRun(){
       q.forEach(d=>{const x=d.data();S.bkDone[x.k]=1;setBlob(x.k,x.d)});save();
       if(V[S.tab]&&!$('#main').hidden)V[S.tab]();toast('Tus datos volvieron');
     }
-    bkSave();bkPump();
-  }catch(e){}
+    bkSave();bkPump();AC.ok=true;
+  }catch(e){setTimeout(acctRun,20000)}
 }
+addEventListener('online',()=>{if(AC.uid){bkSave();bkPump()}});
 function logout(){
   sheet(`<h2>Cerrar sesión</h2><p class="sub">Tus datos quedan en tu cuenta y vuelven al entrar. Las fotos que todavía no se subieron se perderían en este teléfono.</p><button class="btn full" id="loY">Cerrar sesión</button><button class="btn soft full" id="loN">Cancelar</button>`,()=>{
     $('#loN').onclick=closeSheet;
-    $('#loY').onclick=async()=>{await bkSave();AC.out=true;clearTimeout(saveTO);saveTO=0;try{await firebase.auth().signOut()}catch(e){}
+    $('#loY').onclick=async()=>{await bkSave();AC.out=true;clearTimeout(saveTO);saveTO=0;try{await firebase.auth().signOut();const db=firebase.firestore();await db.terminate();await db.clearPersistence()}catch(e){}
       ['tp-state','tp-font','tp-glyphs','tp-partner-font','tp-restore'].forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});
       try{indexedDB.deleteDatabase('tp-blobs')}catch(e){}location.reload()};
   });
@@ -3381,11 +3394,11 @@ function logout(){
 
 function boot(){
 if(S.paired||S.solo){
-  const h=location.hash.slice(1);if(V[h])S.tab=h;
+  const h=location.hash.slice(1);if(Object.hasOwn(V,h))S.tab=h;
   enterApp();checkShare();
   if(S.paired&&S.myPeerId&&S.partnerPeerId)setTimeout(netConnectToPartner,200);
   if(S.paired){setTimeout(setupCheck,1200);drainInbox()}
-  loadBlobsFromIDB().then(()=>{if(Object.keys(blobs).length&&S.tab!=='inicio'&&V[S.tab]&&!$('#main').hidden)V[S.tab]()});
+  loadBlobsFromIDB().then(()=>{bkPump();if(Object.keys(blobs).length&&S.tab!=='inicio'&&V[S.tab]&&!$('#main').hidden)V[S.tab]()});
   // si abrió la app tocando la notificación de una alarma, que suene YA en vez
   // de esperar a que la conexión en vivo confirme el aviso (eso igual llega
   // después y no pasa nada si ya está sonando)
