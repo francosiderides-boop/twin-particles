@@ -2,7 +2,7 @@
 
 **App:** https://francosiderides-boop.github.io/twin-particles/
 **Repo:** https://github.com/francosiderides-boop/twin-particles (rama `main`; GitHub Pages publica sola cada push)
-**Versión actual:** beta 0.54
+**Versión actual:** beta 0.55
 
 ## Contexto (resumen del chat anterior)
 - **Quiénes:** Franco (Android, dueño del proyecto) y Cami, su pareja (iPhone 11). Franco escribe en español rioplatense y espera que cada arreglo se publique de verdad (versión nueva + commit + push), probado, no solo explicado. Pide **gastar pocos tokens**.
@@ -13,6 +13,8 @@
 - **Problema abierto:** Cami tiene el iPhone **siempre en silencio**, y la alarma tiene que sonarle bloqueado y con la app cerrada. Gratis no hay solución: la web no puede pasar el silencio y la app nativa requiere cuenta paga.
 - **Opciones que Franco ya rechazó:** tono estándar de notificación (no suena en silencio), truco con Atajos + SMS (queda por fuera de la app), "Modo dormir" con audio en loop, cuenta de Apple de USD 99.
 - **IPA gratis (AltStore/SideStore) no conviene:** sin push no llega ninguna notificación con la app cerrada, y vence cada 7 días. Solo ganaría alarmas programadas con AlarmKit (sin confirmar que ande con cuenta gratis).
+- **Vía para pasar el silencio (beta 0.55):** tras enviar la alarma, un botón abre `icloud.com/find`; Franco entra con el Apple ID de Cami (con su acuerdo) y toca Reproducir sonido. Apple no da API: automatizarlo exigiría guardar sus credenciales en un servidor, descartado. Sin probar en el iPhone real.
+- **App nativa gratis descartada:** sin push no recibe la alarma en el momento; las alarmas programadas no sirven para despertarla.
 - **Sin probar todavía en los teléfonos reales:** betas 0.52 a 0.54. Se probó contra el servidor real simulando a la pareja desde un navegador: señales y tareas llegan en las dos direcciones, se borran al leerse, un tercero no entra.
 
 ## Para arrancar en una sesión nueva (otra cuenta o chat)

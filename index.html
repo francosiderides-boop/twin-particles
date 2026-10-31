@@ -573,8 +573,9 @@ input[type=range]{width:100%;accent-color:var(--a)}
 
 <script>
 (function(){
-const VERSION='beta 0.54';
+const VERSION='beta 0.55';
 const CHANGELOG=[
+  ['beta 0.55',['Alarma: botón para hacer sonar su iPhone con Buscar de Apple si no contesta']],
   ['beta 0.9',['Lista para usar: se borraron todos los datos de ejemplo','Se quitaron las respuestas simuladas de tu pareja','Despertador: después de enviar una alarma marcás si se despertó o no; con 3 sin despertarse se desbloquea Sueño pesado','Ajustes: “Borrar todo” reemplaza a “Restaurar ejemplo”']],
   ['beta 0.8',['Tocá la partícula de tu pareja y su teléfono vibra','Varios toques seguidos llegan juntos; a veces tu pareja te devuelve el toque','Mantené apretada su partícula para mandarle un latido: su teléfono vibra al ritmo de un corazón mientras la sostengas']],
   ['beta 0.7',['Al vincularte elegís el color de tu partícula, con vista previa en vivo','Ocho colores para elegir; se cambia también desde Ajustes','Nueva tipografía en etiquetas, fechas y horarios','Restaurar los datos de ejemplo ahora pide confirmación escribiendo BORRAR','Corregido: etiquetas de tareas y nombres de las partículas que se superponían']],
@@ -1577,7 +1578,9 @@ function renderAlarm(){
   }else if(alarmState==='sent'){
     const hv=S.lastAlarm&&S.lastAlarm.heavy;
     el.innerHTML=`<div class="ringing ${hv?'hv':''}"><span class="bell">${ICON.bell}</span><div><b>${hv?'Sueño pesado enviado':'Alarma enviada'} a ${esc(S.partner)}</b><div class="sub">${hhmm(S.lastAlarm.t)}${alarmRepIv?' · le vuelve a sonar cada 6 s hasta que conteste (dejá esta pantalla abierta)':''}</div></div></div>
-      <div class="row"><button class="btn soft" id="markIgn" style="flex:1">No se despertó</button><button class="btn" id="resetA" style="flex:1">Se despertó</button></div>`;
+      <div class="row"><button class="btn soft" id="markIgn" style="flex:1">No se despertó</button><button class="btn" id="resetA" style="flex:1">Se despertó</button></div>
+      <a class="btn soft full" href="https://www.icloud.com/find" target="_blank" rel="noopener noreferrer" style="text-decoration:none">¿Sigue sin contestar? Hacer sonar su iPhone</a>
+      <p class="sub">Se abre Buscar de Apple: elegí su iPhone y tocá Reproducir sonido. Suena aunque esté en silencio.</p>`;
     $('#resetA').onclick=()=>{S.ignored=0;save();alarmState='idle';renderAlarm();toast('Contador de alarmas reiniciado')};
     $('#markIgn').onclick=()=>{S.ignored=Math.min(HEAVY_AT,(S.ignored||0)+1);save();alarmState='ignored';renderAlarm();if(S.ignored===HEAVY_AT){vib([40,40,40]);toast('Sueño pesado desbloqueado')}};
   }else if(alarmState==='ignored'){
