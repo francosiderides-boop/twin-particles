@@ -653,6 +653,23 @@ html{touch-action:manipulation}
 .sug{display:flex;flex-direction:column;gap:7px}
 .sug .chip{padding:7px 12px;font-size:13px}
 .sheet{touch-action:pan-y}
+/* ===== Lugares (beta 0.70) ===== */
+.sheet .hero{padding:0;background-size:cover;background-position:center;box-shadow:none;border-radius:16px}
+.sheet>*{flex-shrink:0}
+.results{display:flex;flex-direction:column;gap:8px;max-height:none!important;overflow:visible!important}
+.res{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:16px;text-align:left;background:var(--surface);border:1px solid var(--line);box-shadow:none;transition:transform .2s var(--ease)}
+.res:active{transform:scale(.98)}
+.res .itxt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.res .it{font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plt{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-size:19px;font-weight:600}
+.lc .plt{width:64px;height:64px;font-size:26px;border-radius:16px}
+.recof{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.recof .chip{padding:7px 13px;font-size:13px;flex:none}
+.maphero{position:absolute;inset:0;overflow:hidden;background:var(--surface2);border-radius:inherit}
+.maphero img{position:absolute;width:180px;height:180px;display:block;max-width:none}
+.maphero .pin{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:var(--a);border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.maphero small{position:absolute;right:6px;bottom:4px;padding:1px 5px;border-radius:6px;font-size:10px;color:#333;background:rgba(255,255,255,.8)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -685,7 +702,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.69';
+const VERSION='beta 0.70';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -1921,7 +1938,12 @@ function coverFor(x,kind){
   return kind==='poster'?genPoster(seed,x.t,x.meta):kind==='video'?genThumb(seed,x.t):genArt(seed);
 }
 const PLAY='<svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>';
+const isTile=x=>/tile\.openstreetmap/.test(x.img||'');
+function placeMap(x){if(!isTile(x)||x.lat==null)return '';const z=18,S=180,n=2**z,fx=(+x.lon+180)/360*n,rd=+x.lat*Math.PI/180,fy=(1-Math.log(Math.tan(rd)+1/Math.cos(rd))/Math.PI)/2*n,tx=Math.floor(fx),ty=Math.floor(fy),ox=(fx-tx)*S,oy=(fy-ty)*S;let h='';
+  for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)h+=`<img alt="" src="https://tile.openstreetmap.org/${z}/${tx+i}/${ty+j}.png" style="left:calc(50% + ${Math.round(i*S-ox)}px);top:calc(50% + ${Math.round(j*S-oy)}px)">`;
+  return `<div class="maphero">${h}<span class="pin"></span><small>© OpenStreetMap</small></div>`}
 function thumbHTML(x,kind){
+  if(kind==='place'&&!(x.k&&blobs[x.k])&&(!x.img||isTile(x))){const c=RCOL[(x.g||hashStr(x.t))%4>>>0]||RCOL[0];return `<span class="plt" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${esc((x.t||'?').trim()[0].toUpperCase())}</span>`}
   const dur=kind==='video'&&(String(x.meta||'').match(/\d{1,2}:\d{2}/)||[])[0];
   return `<span class="th th-${kind}" style="background-image:url('${coverFor(x,kind)}')">${kind==='video'?`<span class="playb">${PLAY}</span>${dur?`<span class="dur">${dur}</span>`:''}`:''}</span>`;
 }
@@ -2047,7 +2069,7 @@ V.listas=function(){
 };
 function itemDetail(L,items,i){
   const x=items[i];
-  sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(x,L.kind)}')">${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
+  sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(x,L.kind)}')">${L.kind==='place'?placeMap(x):''}${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
     <div style="display:flex;flex-direction:column;gap:6px">
       <span class="label">${[srcLabel(x),x.meta].filter(Boolean).map(esc).join(' · ')||esc(L.n)}</span>
       <h2>${esc(x.t)}</h2>
@@ -2322,10 +2344,10 @@ async function nearbyPlaces(){
     const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${k}&format=jsonv2&extratags=1&addressdetails=1&limit=40&bounded=1&viewbox=${lon-d},${lat+d},${lon+d},${lat-d}`);if(!r.ok){if(i)break;throw new Error('sin respuesta')}
     (await r.json()).forEach(e=>{if(!e.name||!PLACE_NAME[e.type])return;const id=e.osm_type[0].toUpperCase()+e.osm_id;if(seen[id])return;seen[id]=1;
       const g=e.extratags||{},a=e.address||{},la=+e.lat,lo=+e.lon,m=metersTo(lat,lon,la,lo),addr=[a.road&&(a.road+(a.house_number?' '+a.house_number:'')),a.suburb||a.neighbourhood,a.city||a.town].filter(Boolean).join(', ');
-      const score=(g.website||g['contact:website']?3:0)+(g.instagram||g['contact:instagram']?3:0)+(g.cuisine?2:0)+(g.wikidata||g.wikipedia?3:0)+(g.opening_hours?1:0)+(g.phone||g['contact:phone']?1:0)-m/500;
-      out.push({t:e.name,meta:[PLACE_NAME[e.type],distTxt(m),addr].filter(Boolean).join(' · '),addr,lat:la,lon:lo,osm:id,img:tileFor(la,lo),desc:'',score})});
+      const score=(g.website||g['contact:website']?3:0)+(g.instagram||g['contact:instagram']?3:0)+(g.cuisine?2:0)+(g.wikidata||g.wikipedia?3:0)+(g.opening_hours?1:0)+(g.phone||g['contact:phone']?1:0);
+      out.push({t:e.name,meta:[PLACE_NAME[e.type],distTxt(m),addr].filter(Boolean).join(' · '),addr,lat:la,lon:lo,osm:id,img:tileFor(la,lo),desc:'',score,band:Math.floor(m/400)})});
   }
-  return out.sort((a,b)=>b.score-a.score).slice(0,15).map(({score,...x})=>x);
+  return out.sort((a,b)=>a.band-b.band||b.score-a.score).slice(0,30).map(({score,band,...x})=>x);
 }
 function placeLinks(x){
   const a=(h,t,soft=true)=>`<a class="btn ${soft?'soft':''} full" href="${esc(h)}" target="_blank" rel="noopener">${esc(t)}</a>`;
@@ -2339,19 +2361,20 @@ function addItem(L,items,reco){
   const has=t=>items.some(x=>norm(x.t)===norm(t));
   sheet(`<h2>Agregar a ${L.n}</h2>
     <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg><input class="input" id="sq" placeholder="${SEARCH_PH[L.id]}" autocomplete="off" enterkeyhint="search" aria-label="${SEARCH_PH[L.id]}"></div>
-    ${L.id==='rest'?`<button class="btn soft full" id="nearB">Recomendame lugares cerca</button>`:''}
+    ${L.id==='rest'?`<button class="btn soft full" id="nearB">Recomendame lugares cerca</button><div class="recof" id="recoF" hidden>${[['','Todos'],['Restaurante','Restaurantes'],['Café','Cafés'],['Bar','Bares']].map(([v,n],i)=>`<button class="chip ${i?'':'on'}" data-rf="${v}">${n}</button>`).join('')}</div>`:''}
     <div class="results" id="sres"><p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p></div>
     <button class="linkbtn" id="manual" style="align-self:flex-start">¿No aparece? Cargalo a mano</button>
     <div id="mform" hidden style="display:flex;flex-direction:column;gap:14px"></div>
     <p class="sub">${({pelis:'Busca en Wikipedia.',series:'Busca en Wikipedia y TVMaze.',yt:'Busca en YouTube. También podés pegar el link de un video.',pod:'Busca en Apple Podcasts.',rest:'Lugares de OpenStreetMap. Si no aparece, cargalo a mano y pegá el link de Google Maps o Instagram.'})[L.id]||''}</p>`,()=>{
-    let res=[],deb,tok=0,recoOn=false;
+    let res=[],deb,tok=0,recoOn=false,recoAll=null,recoT='';
     const q=$('#sq');q.focus();
     const draw=async()=>{
       const v=q.value.trim(),my=++tok;
       if(v.length<2&&!recoOn){$('#sres').innerHTML='<p class="sub">Escribí al menos dos letras. Al elegir un resultado se completa todo solo.</p>';return}
       let failed=false;
       if(L.id==='rest'){$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';
-        try{res=v.length>=2?await searchPlaces(v):await nearbyPlaces()}catch(e){failed=true;res=[]}
+        try{if(v.length>=2)res=await searchPlaces(v);else{recoAll=recoAll||await nearbyPlaces();res=recoAll.filter(x=>!recoT||x.meta.startsWith(recoT))}}catch(e){failed=true;res=[]}
+        const rfb=$('#recoF');if(rfb)rfb.hidden=!(recoOn&&v.length<2);
         if(my!==tok)return}
       else{$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';
         try{res=await searchRemote(L.id,v)}catch(e){failed=true;res=searchCat(L.id,v)}
@@ -2364,11 +2387,12 @@ function addItem(L,items,reco){
     q.oninput=()=>{clearTimeout(deb);$('#sres').innerHTML='<div class="waiting"><span class="spin"></span>Buscando…</div>';deb=setTimeout(draw,450)};
     q.onkeydown=e=>{if(e.key==='Enter'){clearTimeout(deb);draw()}};
     const askNear=()=>{const b=$('#nearB');if(!navigator.geolocation)return toast('Este teléfono no da la ubicación');b.textContent='Buscando tu ubicación…';
-      navigator.geolocation.getCurrentPosition(p=>{nearPos={lat:p.coords.latitude,lon:p.coords.longitude};recoOn=true;if(!$('#nearB'))return;b.textContent='Lugares cerca tuyo';q.value='';draw()},e=>{b.textContent='Recomendame lugares cerca';toast(e.code===1?'Permití la ubicación para esta app en los ajustes del teléfono':'No se pudo obtener tu ubicación')},{timeout:12000,maximumAge:300000})};
+      navigator.geolocation.getCurrentPosition(p=>{nearPos={lat:p.coords.latitude,lon:p.coords.longitude};recoOn=true;recoAll=null;if(!$('#nearB'))return;b.textContent='Lugares cerca tuyo';q.value='';draw()},e=>{b.textContent='Recomendame lugares cerca';toast(e.code===1?'Permití la ubicación para esta app en los ajustes del teléfono':'No se pudo obtener tu ubicación')},{timeout:12000,maximumAge:300000})};
+    document.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{recoT=b.dataset.rf;document.querySelectorAll('[data-rf]').forEach(o=>o.classList.toggle('on',o===b));draw()});
     $('#nearB')&&($('#nearB').onclick=askNear);if(reco)askNear();
     const preview=x=>{
       const it=Object.assign({by:'m',g:hashStr(x.t),id:uid()},x);
-      sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(it,L.kind)}')">${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
+      sheet(`<div class="hero ${L.kind}" style="background-image:url('${coverFor(it,L.kind)}')">${L.kind==='place'?placeMap(it):''}${L.kind==='video'?`<span class="playb lg">${PLAY}</span>`:''}</div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <span class="label">${[srcLabel(it),it.meta].filter(Boolean).map(esc).join(' · ')}</span>
           <h2>${esc(it.t)}</h2>
@@ -2377,7 +2401,7 @@ function addItem(L,items,reco){
         ${L.kind==='place'?`<div id="plx" style="display:flex;flex-direction:column;gap:8px">${placeLinks(it)}</div>`:''}
         ${has(it.t)?'<div class="note">Ya está en la lista.</div>':''}
         <div class="row"><button class="btn soft" id="pBack" style="flex:1">Buscar otra</button><button class="btn" id="pAdd" style="flex:2">Agregar a ${L.n}</button></div>`,()=>{
-        const redraw=()=>{const p=$('#plx');if(!p)return;p.innerHTML=placeLinks(it);$('#pDesc').textContent=it.desc||'';const h=$('.sheet .hero');if(h)h.style.backgroundImage=`url('${coverFor(it,L.kind)}')`};
+        const redraw=()=>{const p=$('#plx');if(!p)return;p.innerHTML=placeLinks(it);$('#pDesc').textContent=it.desc||'';const h=$('.sheet .hero');if(h){h.style.backgroundImage=`url('${coverFor(it,L.kind)}')`;if(!isTile(it)){const mh=h.querySelector('.maphero');if(mh)mh.remove()}}};
         const infoP=L.kind==='place'&&it.osm?placeInfo(it).catch(()=>{}).then(redraw).then(()=>siteInfo(it)).catch(()=>{}).then(redraw):null;
         $('#pBack').onclick=()=>addItem(L,items,reco);
         $('#pAdd').onclick=async()=>{if(infoP){$('#pAdd').disabled=true;await Promise.race([infoP,new Promise(r=>setTimeout(r,2500))])}items.unshift(it);save();netSendSure({type:'listadd',listId:L.id,item:it});pushPartner('Agregó a '+L.n,it.t,'list');closeSheet();V.listas();entangle();toast('Agregado a '+L.n)};
