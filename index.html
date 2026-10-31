@@ -664,7 +664,7 @@ html{touch-action:manipulation}
 
 <script>
 (function(){
-const VERSION='beta 0.61';
+const VERSION='beta 0.62';
 const CHANGELOG=[
   ['beta 0.57',['Avisos: si tu pareja deja de actualizar su estado, las notificaciones vuelven a salir a los 30 s']],
   ['beta 0.56',['Avisos: menos riesgo de perder una notificación si tu pareja acaba de bloquear el teléfono']],
@@ -2318,9 +2318,9 @@ V.cartas=function(){
   const inbox=S.letters.filter(l=>l.from==='p');
   const nuevas=inbox.filter(isNew).length;
   const rank=l=>isNew(l)?0:(l.openAt&&l.openAt>TODAYS)?1:2;
-  const inside=inbox.slice().sort((a,b)=>rank(a)-rank(b)||b.date.localeCompare(a.date)).slice(0,3);
+  const inside=inbox.filter(l=>!l.opened).sort((a,b)=>rank(a)-rank(b)||b.date.localeCompare(a.date)).slice(0,3);
   const rot=[-9,5,-3],left=[8,54,98];
-  const list=S.letters.filter(l=>box==='in'?l.from==='p':l.from==='m').sort((a,b)=>b.date.localeCompare(a.date));
+  const list=S.letters.filter(l=>box==='in'?l.from==='p'&&l.opened:l.from==='m').sort((a,b)=>b.date.localeCompare(a.date));
   render(`<section class="section">
     <div class="sechead"><h2>Buzón</h2><span class="label">${nuevas?nuevas+(nuevas>1?' cartas nuevas':' carta nueva'):'Al día'}</span></div>
     <div class="mb-scene">
@@ -2338,6 +2338,7 @@ V.cartas=function(){
     <button class="btn full" id="write">Escribir una carta</button>
   </section>
   <section class="section">
+    <div class="sechead"><h2>Cajón de cartas</h2><span class="label">${list.length||''}</span></div>
     <div class="seg"><button class="${box==='in'?'on':''}" data-b="in">Recibidas</button><button class="${box==='out'?'on':''}" data-b="out">Enviadas</button></div>
     <div class="letters" id="lets"></div>
   </section>`);
@@ -2350,7 +2351,7 @@ V.cartas=function(){
   $('#lets').innerHTML=list.length?list.map(l=>{
     const locked=l.openAt&&l.openAt>TODAYS;
     const st=box==='out'?(l.opened?'<span class="tag">Leída</span>':'<span class="tag">Sin leer</span>'):locked?`<span class="tag">${fmtD(l.openAt)}</span>`:l.opened?'':'<span class="tag new">Nueva</span>';
-    return `<button class="env ${l.opened?'opened':''}" data-id="${l.id}"><span class="seal"></span><span class="meta"><b>${esc(l.title)}</b><span class="sub">${l.kind==='audio'?'Audio':l.kind==='text'?'Carta':'Foto de carta'} · ${fmtD(l.date)}${locked?' · se abre ese día':''}</span></span>${st}</button>`}).join(''):'<p class="empty">Todavía no hay cartas acá.</p>';
+    return `<button class="env ${l.opened?'opened':''}" data-id="${l.id}"><span class="seal"></span><span class="meta"><b>${esc(l.title)}</b><span class="sub">${l.kind==='audio'?'Audio':l.kind==='text'?'Carta':'Foto de carta'} · ${fmtD(l.date)}${locked?' · se abre ese día':''}</span></span>${st}</button>`}).join(''):`<p class="empty">${box==='in'?'Las cartas que abras se guardan acá.':'Todavía no mandaste cartas.'}</p>`;
   document.querySelectorAll('.env').forEach(b=>b.onclick=()=>openLetter(S.letters.find(l=>l.id===b.dataset.id)));
   $('#write').onclick=()=>compose();
 };
@@ -2398,7 +2399,7 @@ async function openLetter(l){
     $('#cl').onclick=closeSheet;
     if(l.kind==='audio')$('#pl').onclick=()=>l.sample?playTune():playBlob(blobs[l.k]);
   });
-  if(l.from==='p'&&!l.opened){l.opened=1;save();entangle();updateBadge();netSendSure({type:'letterRead',id:l.id})}
+  if(l.from==='p'&&!l.opened){l.opened=1;save();entangle();updateBadge();netSendSure({type:'letterRead',id:l.id});box='in';if(S.tab==='cartas'&&!$('#main').hidden)V.cartas();toast('Guardada en el cajón de cartas')}
 }
 let actx,tuneOn=0;
 function playTune(){
