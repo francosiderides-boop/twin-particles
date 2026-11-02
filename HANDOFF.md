@@ -79,3 +79,10 @@ Fechas: `S.h.fechas`; cada teléfono manda su lista al Worker (`{rem}`, Durable 
 
 ## Entorno en la Mac de Franco
 Repo en `~/twin-particles`; GitHub CLI y Wrangler ya logueados; node instalado (`node --check` funciona).
+
+## APK de Android (TWA)
+- `twin-particles.apk` en el repo; se descarga desde `https://francosiderides-boop.github.io/twin-particles/twin-particles.apk`. Abre la misma web dentro de Chrome (Trusted Web Activity), así que avisos, datos y vínculo son los de la web.
+- Proyecto en `~/twin-particles-android` (fuera del repo): `twa-manifest.json`, clave `twin.keystore` + contraseña `pass.txt`. **No perder la clave:** sin ella no se puede actualizar el APK instalado.
+- Compilar: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ANDROID_HOME=/opt/homebrew/share/android-commandlinetools ./gradlew assembleRelease`, después `zipalign` y `apksigner` de `build-tools/35.0.0` (Bubblewrap no reconoce el SDK de Homebrew).
+- Huella SHA-256 del certificado: `A7:51:EE:5E:3D:1E:25:19:2C:FB:66:68:F0:90:80:D4:11:CF:31:42:2D:D3:69:5F:ED:80:09:36:38:10:4D:CA`. Para sacar la barra de dirección hace falta `/.well-known/assetlinks.json` en la raíz `francosiderides-boop.github.io` (otro repo), todavía no creado.
+- Solo hay que recompilar si cambian el nombre, el ícono o los colores; los cambios de la web llegan solos.
