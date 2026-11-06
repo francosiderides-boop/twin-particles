@@ -72,8 +72,8 @@ Fechas: `S.h.fechas`; cada teléfono manda su lista al Worker (`{rem}`, Durable 
 
 ## Pendiente
 1. Probar la 0.54 en los teléfonos reales: que Franco vea "Revisar avisos" → "Teléfono de Cami" y le mande una alarma con el iPhone bloqueado.
-2. Opcional y gratis: APK de Android para Franco (Capacitor + FCM), con alarma fuerte en pantalla bloqueada. Hay que instalar Java y Android SDK en la Mac. Franco todavía no la pidió.
-3. Opcional: investigar si AlarmKit anda con Apple ID gratis, solo para alarmas programadas.
+2. APK de Android: hecho (TWA, ver sección APK). Falta probarlo instalado.
+3. AlarmKit/app nativa gratis: descartado (sin push no despierta a nadie).
 - Audios de más de ~1 MB: siguen sin solución gratis (Storage pide Blaze).
 - Ideas: recordatorios con horario para tareas/eventos, aniversarios, modo "llegué bien".
 
